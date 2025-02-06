@@ -20,7 +20,7 @@ class History:
 
 
     def stats(self) -> dict:
-        with sqlite3.connect('records.sqlite') as conn:
+        with sqlite3.connect(self.filename) as conn:
             cursor = conn.cursor()
 
             cols = ['co2', 'temperature', 'humidity', 'pressure']
@@ -42,13 +42,16 @@ class History:
 
 
     def latest(self) -> dict:
-        with sqlite3.connect('records.sqlite') as conn:
+        with sqlite3.connect(self.filename) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("select * from records order by date desc limit 1")
             row = cursor.fetchone()
-            result = dict(row)
-            result['date'] = datetime.strptime(result['date'], self.date_format).replace(tzinfo=timezone.utc)
+            if row is not None:
+                result = dict(row)
+                result['date'] = datetime.strptime(result['date'], self.date_format).replace(tzinfo=timezone.utc)
+            else:
+                result = {col: None for col in ['date', 'co2', 'temperature', 'humidity', 'pressure']}
             return result
 
 
@@ -68,7 +71,7 @@ class History:
                     if value is not None:
                         value = fn(value)
                     else:
-                        'x'
+                        value = 'x'
                     print(f"{value:>7}", end='')
                 print()
 
@@ -104,11 +107,19 @@ class History:
 
 
     def create(self) -> None:
-        try:
-            with open(self.filename, 'x') as file:
-                file.write('Time(MM/DD/YYYY hh:mm:ss),Carbon dioxide(ppm),Temperature(°C),Relative humidity(%),Atmospheric pressure(hPa)\n')
-        except FileExistsError:
-            pass
+        with sqlite3.connect(self.filename) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+create table if not exists records (
+    date text,
+    co2 real,
+    temperature real,
+    humidity real,
+    pressure real,
+    primary key(date)
+);
+                           """)
+                conn.commit()
 
 
     def update(self) -> int:
@@ -156,7 +167,7 @@ def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device', default=True)
-    parser.add_argument('--file', metavar='file_path', help='path to the record file', default='records.csv')
+    parser.add_argument('--file', metavar='file_path', help='path to the record file', default='records.sqlite')
     # we're formatting this way for https://github.com/the-butcher/ARANET4_VIS
     parser.add_argument('--format', metavar='date_format', help='date format', default='%Y/%m/%d %H:%M:%S')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device (defaults to value of ARANET_MAC)', default=device_mac_from_envvar())
