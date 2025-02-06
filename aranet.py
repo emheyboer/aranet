@@ -1,6 +1,5 @@
 #!/usr/bin/env venv/bin/python
 import aranet4
-import csv
 import sys
 import os
 import tzlocal
@@ -152,16 +151,18 @@ create table if not exists records (
 
 
     def write(self, records: list) -> None:
-        with open(self.filename, 'a', newline='') as file:
-            writer = csv.writer(file, quoting=csv.QUOTE_ALL)
+        with sqlite3.connect(self.filename) as conn:
+            cursor = conn.cursor()
+
             for entry in records:
-                writer.writerow([
+                cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
                     entry.date.strftime(self.date_format),
                     entry.co2,
-                    entry.temperature,
+                    entry.temperature * 9/5 + 32,  # convert celsius to fahrenheit
                     entry.humidity,
-                    entry.pressure
-                    ])
+                    entry.pressure,
+                ])
+            conn.commit()
 
 
 def parse_args(argv):
