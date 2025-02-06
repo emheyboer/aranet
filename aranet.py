@@ -136,7 +136,7 @@ create table if not exists records (
             },
         )
 
-        # get_all_records() returns empty records those that are filtered by "start"
+        # get_all_records() returns empty records for those that are filtered by "start"
         # so we have to remove them before writing
         new_records = []
         for entry in records.value:
