@@ -5,6 +5,7 @@ import sys
 import os
 import tzlocal
 import argparse
+import sqlite3
 from datetime import datetime, timezone, timedelta
 
 
@@ -19,85 +20,42 @@ class History:
 
 
     def stats(self) -> dict:
-        stats = {'count': 0}
-        for row in ['min', 'max', 'mean', 'sum']:
-            stats[row] = {
-                    'co2': None,
-                    'temperature': None,
-                    'humidity': None,
-                    'pressure': None,
-                    }
+        with sqlite3.connect('records.sqlite') as conn:
+            cursor = conn.cursor()
 
-        record = None
-
-        with open(self.filename, 'r') as file:
-            reader = csv.reader(file, quoting=csv.QUOTE_ALL)
-            header = True
-            for row in reader:
-                if header:
-                    header = False
-                    continue
-
-                stats['count'] += 1
-
-                record = {
-                        'co2': int(row[1]),
-                        'temperature': float(row[2]),
-                        'humidity': int(row[3]),
-                        'pressure': float(row[4]),
-                        }
-
-                for stat in ['co2', 'temperature', 'humidity', 'pressure']:
-
-                    if stats['min'][stat] is None or record[stat] < stats['min'][stat]:
-                        stats['min'][stat] = record[stat]
-                    if stats['max'][stat] is None or record[stat] > stats['max'][stat]:
-                         stats['max'][stat] = record[stat]
-
-                    stats['sum'][stat] = record[stat] + (stats['sum'][stat] or 0)
-
-        if stats['count'] > 1:
-            for stat in ['co2', 'temperature', 'humidity', 'pressure']:
-                stats['mean'][stat] = stats['sum'][stat] / stats['count']
-
-        return stats
+            cols = ['co2', 'temperature', 'humidity', 'pressure']
+            stats = {
+                'min': f"select {', '.join([f"min({col})" for col in cols])} from records;",
+                'max': f"select {', '.join([f"max({col})" for col in cols])} from records;",
+                'mean': f"select {', '.join([f"avg({col})" for col in cols])} from records;",
+                'count': "select count(*) from records",
+            }
+            for stat in stats:
+                cursor.execute(stats[stat])
+                row = cursor.fetchone()
+                if stat == 'count':
+                    stats[stat] = row[0]
+                else:
+                    stats[stat] = {cols[i]: row[i] for i in range(len(row))}
+            return stats
 
 
-    # normally we load the entire file line-by-line and find this in the process
-    # if we're only updating, this lets us skip the rest of the file
+
     def latest(self) -> dict:
-        with open(self.filename, 'rb') as file:
-            try:
-                file.seek(-2, os.SEEK_END)
-                while file.read(1) != b'\n':
-                    file.seek(-2, os.SEEK_CUR)
-
-                line = file.readline().decode()
-                reader = csv.reader([line], quoting=csv.QUOTE_ALL)
-                row = reader.__next__()
-                return {
-                    'date': datetime.strptime(row[0], self.date_format).replace(tzinfo=timezone.utc),
-                    'co2': int(row[1]),
-                    'temperature': float(row[2]),
-                    'humidity': int(row[3]),
-                    'pressure': float(row[4]),
-                }
-
-            # there's only one line, so there aren't any records
-            except OSError:
-                return {
-                    'date': None,
-                    'co2': None,
-                    'temperature': None,
-                    'humidity': None,
-                    'pressure': None,
-                }
+        with sqlite3.connect('records.sqlite') as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("select * from records order by date desc limit 1")
+            row = cursor.fetchone()
+            result = dict(row)
+            result['date'] = datetime.strptime(result['date'], self.date_format).replace(tzinfo=timezone.utc)
+            return result
 
 
     def print_table(self, stats: dict, width: int) -> None:
         print(f"{"temp  humid  press    co2":>34}")
         columns = [  # (name, formatter)
-            ('temperature', lambda x: f"{(x * 9/5 + 32):,.0f}°"),  # convert celsius to fahrenheit
+            ('temperature', lambda x: f"{x:,.0f}°"),
             ('humidity', lambda x: f"{x:,.0f}%"),
             ('pressure', lambda x: f"{x:,.0f}"),
             ('co2', lambda x: f"{x:,.0f}"),
@@ -200,7 +158,7 @@ def parse_args(argv):
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device', default=True)
     parser.add_argument('--file', metavar='file_path', help='path to the record file', default='records.csv')
     # we're formatting this way for https://github.com/the-butcher/ARANET4_VIS
-    parser.add_argument('--format', metavar='date_format', help='date format', default='%m/%d/%Y %H:%M:%S')
+    parser.add_argument('--format', metavar='date_format', help='date format', default='%Y/%m/%d %H:%M:%S')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device (defaults to value of ARANET_MAC)', default=device_mac_from_envvar())
 
     return parser.parse_args(argv)
