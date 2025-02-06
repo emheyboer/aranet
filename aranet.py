@@ -21,13 +21,14 @@ class History:
 
     def stats(self) -> dict:
         with sqlite3.connect(self.filename) as conn:
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
             cols = ['co2', 'temperature', 'humidity', 'pressure']
             stats = {
-                'min': f"select {', '.join([f"min({col})" for col in cols])} from records;",
-                'max': f"select {', '.join([f"max({col})" for col in cols])} from records;",
-                'mean': f"select {', '.join([f"avg({col})" for col in cols])} from records;",
+                'min': f"select {', '.join([f"min({col}) as {col}" for col in cols])} from records;",
+                'max': f"select {', '.join([f"max({col}) as {col}" for col in cols])} from records;",
+                'mean': f"select {', '.join([f"avg({col}) as {col}" for col in cols])} from records;",
                 'count': "select count(*) from records",
             }
             for stat in stats:
@@ -36,7 +37,7 @@ class History:
                 if stat == 'count':
                     stats[stat] = row[0]
                 else:
-                    stats[stat] = {cols[i]: row[i] for i in range(len(row))}
+                    stats[stat] = dict(row)
             return stats
 
 
