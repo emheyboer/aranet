@@ -65,15 +65,15 @@ class History:
         ]
         for row in ['min', 'max', 'mean', 'latest']:
             if row in stats:
-                print(f"{row:6}", end='')
+                line = f"{row:6}"
                 for (stat, suffix) in columns:
                     value = stats[row][stat]
                     if value is not None:
                         value = f"{value:,.0f}{suffix}"
                     else:
                         value = 'x'
-                    print(f"{value:>7}", end='')
-                print()
+                    line += f"{value:>7}"
+                print(line)
 
 
     def print(self, get_stats=True, new_records=None) -> None:
