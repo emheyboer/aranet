@@ -57,19 +57,19 @@ class History:
 
     def print_table(self, stats: dict, width: int) -> None:
         print(f"{"temp  humid  press    co2":>34}")
-        columns = [  # (name, formatter)
-            ('temperature', lambda x: f"{x:,.0f}°"),
-            ('humidity', lambda x: f"{x:,.0f}%"),
-            ('pressure', lambda x: f"{x:,.0f}"),
-            ('co2', lambda x: f"{x:,.0f}"),
+        columns = [  # (name, suffix)
+            ('temperature', '°'),
+            ('humidity','%'),
+            ('pressure', ''),
+            ('co2', ''),
         ]
         for row in ['min', 'max', 'mean', 'latest']:
             if row in stats:
                 print(f"{row:6}", end='')
-                for (stat, fn) in columns:
+                for (stat, suffix) in columns:
                     value = stats[row][stat]
                     if value is not None:
-                        value = fn(value)
+                        value = f"{value:,.0f}{suffix}"
                     else:
                         value = 'x'
                     print(f"{value:>7}", end='')
