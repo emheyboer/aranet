@@ -170,7 +170,6 @@ def parse_args(argv):
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device', default=True)
     parser.add_argument('--file', metavar='file_path', help='path to the record file', default='records.sqlite')
-    # we're formatting this way for https://github.com/the-butcher/ARANET4_VIS
     parser.add_argument('--format', metavar='date_format', help='date format', default='%Y/%m/%d %H:%M:%S')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device (defaults to value of ARANET_MAC)', default=device_mac_from_envvar())
 
