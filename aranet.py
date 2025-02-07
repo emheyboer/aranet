@@ -134,10 +134,9 @@ create table if not exists records (
                 "co2": True,
                 "start": latest,
             },
+            remove_empty=True
         )
 
-        # get_all_records() returns empty records for those that are filtered by "start"
-        # so we have to remove them before writing
         new_records = []
         for entry in records.value:
             # a record isn't always returned with the same time
