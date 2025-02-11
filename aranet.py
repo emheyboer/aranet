@@ -5,17 +5,24 @@ import os
 import tzlocal
 import argparse
 import sqlite3
+import configparser
 from datetime import datetime, timezone, timedelta
 
 
 class History:
-    def __init__(self, *, date_format: str, filename, device_mac):
+    def __init__(self, *, date_format: str, filename: str, config_file: str):
         self.date_format = date_format
         self.filename = filename
-        self.device_mac = device_mac
+        self.config = self.load_config(config_file)
 
         self.create()
         self.last_recorded = self.latest()
+
+
+    def load_config(self, filename):
+        config = configparser.ConfigParser()
+        config.read(filename)
+        return config
 
 
     def stats(self) -> dict:
@@ -126,7 +133,7 @@ create table if not exists records (
         latest = self.last_recorded['date'] or datetime.fromtimestamp(0, tz=timezone.utc)
 
         records = aranet4.client.get_all_records(
-            self.device_mac,
+            self.config['aranet']['mac'],
             entry_filter = {
                 "temp": True,
                 "humi": True,
@@ -168,9 +175,10 @@ def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device', default=True)
-    parser.add_argument('--file', metavar='file_path', help='path to the record file', default='records.sqlite')
+    parser.add_argument('--file', metavar='file_path', help='path to the record file (defaults to records.sqlite)', default='records.sqlite')
+    parser.add_argument('--config', metavar='config_path', help='path to the config file (defaults to config.ini)', default='config.ini')
     parser.add_argument('--format', metavar='date_format', help='date format', default='%Y/%m/%d %H:%M:%S')
-    parser.add_argument('--mac', metavar='mac_address', help='mac address of the device (defaults to value of ARANET_MAC)', default=device_mac_from_envvar())
+    parser.add_argument('--mac', metavar='mac_address', help='mac address of the device')
 
     return parser.parse_args(argv)
 
@@ -201,24 +209,24 @@ def find_device_mac() -> str | None:
     return None
 
 
-def device_mac_from_envvar() -> str | None:
-    if 'ARANET_MAC' in os.environ:
-        return os.environ['ARANET_MAC']
-    return None
-
-
 def main():
     args = parse_args(sys.argv[1:])
 
-    # if a MAC address isn't supplied by env var or arguments,
+    history = History(date_format=args.format, filename=args.file, config_file=args.config)
+
+    if 'aranet' not in history.config:
+        history.config['aranet'] = {}
+
+    if args.mac is not None:
+        history.config['aranet']['mac'] = args.mac
+
+    # if a MAC address isn't supplied by config or arguments,
     # we can try to scan for bluetooth devices
-    if args.mac is None and args.update:
-        args.mac = find_device_mac()
-        if args.mac is None:
+    if 'mac' not in history.config['aranet']:
+        history.config['aranet']['mac'] = find_device_mac()
+        if history.config['aranet']['mac'] is None:
             print('Unable to get device MAC address')
             exit(1)
-
-    history = History(date_format=args.format, filename=args.file, device_mac=args.mac)
 
     new_records = None
     if args.update:
