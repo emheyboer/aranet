@@ -71,12 +71,16 @@ class Monitor:
 
     def maybe_notify(self, body):
         current = self.current
-        previous = self.history[-1]
+        if len(self.history) > 0:
+            previous = self.history[-1]
+        else:
+            previous = current
+            
         ttl = self.interval - self.last_seen
         alerts = []
         
         dco2 = current.co2 - previous.co2
-        if dco2 > 0 and curr.co2 > 1400:
+        if dco2 > 0 and current.co2 > 1400:
             alerts.append('rising co2')
         if current.temperature < 50:
             alerts.append('low temperature')
@@ -90,7 +94,10 @@ class Monitor:
 
     def display_readings(self, mode):
         current = self.current
-        previous = self.history[-1]
+        if len(self.history) > 0:
+            previous = self.history[-1]
+        else:
+            previous = current
         color = current.status.name.lower()
 
         output = '\n' if mode == DisplayMode.terminal else ''
