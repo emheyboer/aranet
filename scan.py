@@ -4,9 +4,7 @@ import sys
 import asyncio
 from aranet4 import Aranet4Scanner
 from enum import Enum
-
-global ago
-global prev
+import configparser
 
 
 class DisplayMode(Enum):
@@ -14,18 +12,119 @@ class DisplayMode(Enum):
     notification = 2
 
 
-def notify(title, body, ttl):
-    conn = http.client.HTTPSConnection("api.pushover.net:443")
-    conn.request("POST", "/1/messages.json",
-    urllib.parse.urlencode({
-        "token": "",
-        "user": "",
-        "title": title,
-        "message": body,
-        "ttl": ttl,
-        "html": 1,
-    }), { "Content-type": "application/x-www-form-urlencoded" })
-    conn.getresponse()
+class Monitor:
+    def __init__(self, config_filename):
+        self.last_seen = None
+        self.interval = None
+        self.history = []
+        self.current = None
+        self.config = self.load_config(config_filename)
+
+    
+    async def start(self):
+        known_age = None
+        offset = 0
+
+        scanner = Aranet4Scanner(self.on_scan)
+        await scanner.start()
+        while True: # Run forever
+            await asyncio.sleep(1)
+            if len(self.history) > 0:
+                # If the scanner finds something new, use that age
+                if known_age is None or known_age != self.last_seen:
+                    known_age = self.last_seen
+                    offset = 0
+                offset += 1
+                print(f"  Age:           {known_age + offset}/{self.interval}" + ' '*5, end='\r')
+        await scanner.stop()
+
+
+    def load_config(self, filename):
+            config = configparser.ConfigParser()
+            config.read(filename)
+            return config
+
+
+    def notify(self, title, body, ttl):
+        conn = http.client.HTTPSConnection("api.pushover.net:443")
+        conn.request("POST", "/1/messages.json",
+        urllib.parse.urlencode({
+            "token": self.config['pushover']['token'],
+            "user": self.config['pushover']['user'],
+            "title": title,
+            "message": body,
+            "ttl": ttl,
+            "html": 1,
+        }), { "Content-type": "application/x-www-form-urlencoded" })
+        conn.getresponse()
+
+
+    def show_change(self, prev, curr):
+        delta = curr - prev
+        symbol = '⇵'
+        if delta > 0:
+            symbol = '↑'
+        elif delta < 0:
+            symbol = '↓'
+        return f"{symbol} {delta:.01f}"
+
+
+    def maybe_notify(self, body):
+        current = self.current
+        previous = self.history[-1]
+        ttl = self.interval - self.last_seen
+        alerts = []
+        
+        dco2 = current.co2 - previous.co2
+        if dco2 > 0 and curr.co2 > 1400:
+            alerts.append('rising co2')
+        if current.temperature < 50:
+            alerts.append('low temperature')
+        if current.temperature > 80:
+            alerts.append('high temperature')
+
+        if len(alerts) > 0:
+            title = '; '.join(alerts)
+            self.notify(title, body, max(ttl, 60))
+
+
+    def display_readings(self, mode):
+        current = self.current
+        previous = self.history[-1]
+        color = current.status.name.lower()
+
+        output = '\n' if mode == DisplayMode.terminal else ''
+        output += f"  CO2:           {colorize(color, current.co2, mode)} ppm {self.show_change(previous.co2, current.co2)}" + '\n'
+        output += f"  Temperature:   {(current.temperature):.01f} °F {self.show_change(previous.temperature, current.temperature)}" + '\n'
+        output += f"  Humidity:      {current.humidity}% {self.show_change(previous.humidity, current.humidity)}" + '\n'
+        output += f"  Pressure:      {current.pressure:.01f} hPa {self.show_change(previous.pressure, current.pressure)}" + '\n'
+        output += f"  Battery:       {current.battery}%" + '\n'
+        output += f"  Age:           {self.last_seen}/{self.interval}"
+
+        return output
+
+    def on_scan(self, advertisement):
+        if advertisement.device.address != self.config['aranet']['mac']:
+            return
+
+        if not advertisement.readings:
+            return
+        
+        self.current = advertisement.readings
+
+        if self.last_seen is None or advertisement.readings.ago < self.last_seen: 
+            self.current.temperature = self.current.temperature * 9/5 + 32
+
+            term_output = self.display_readings(DisplayMode.terminal)
+            notif_output = self.display_readings(DisplayMode.notification)
+
+            print(term_output, end='\r')
+            self.maybe_notify(notif_output)
+
+            self.history.append(self.current)
+
+            
+        self.history.last_seen = self.current.last_seen
 
 
 def colorize(color, text, mode):
@@ -48,104 +147,16 @@ def colorize(color, text, mode):
     else:
         result = text
     return result
-
-
-def show_change(prev, curr):
-    delta = curr - prev
-    symbol = '⇵'
-    if delta > 0:
-        symbol = '↑'
-    elif delta < 0:
-        symbol = '↓'
-    return f"{symbol} {delta:.01f}"
-
-
-def maybe_notify(prev, curr, body):
-    ttl = curr.interval - curr.ago
-    alerts = []
-    
-    dco2 = curr.co2 - prev.co2
-    if dco2 > 0 and curr.co2 > 1400:
-        alerts.append('rising co2')
-    if curr.temperature < 50:
-        alerts.append('low temperature')
-    if curr.temperature > 80:
-        alerts.append('high temperature')
-
-    if len(alerts) > 0:
-        title = '; '.join(alerts)
-        notify(title, body, max(ttl, 60))
-
-
-def display_readings(prev, curr, mode):
-    color = curr.status.name.lower()
-
-    output = '\n' if mode == DisplayMode.terminal else ''
-    output += f"  CO2:           {colorize(color, curr.co2, mode)} ppm {show_change(prev.co2, curr.co2)}" + '\n'
-    output += f"  Temperature:   {(curr.temperature):.01f} °F {show_change(prev.temperature, curr.temperature)}" + '\n'
-    output += f"  Humidity:      {curr.humidity}% {show_change(prev.humidity, curr.humidity)}" + '\n'
-    output += f"  Pressure:      {curr.pressure:.01f} hPa {show_change(prev.pressure, curr.pressure)}" + '\n'
-    output += f"  Battery:       {curr.battery}%" + '\n'
-    output += f"  Age:           {curr.ago}/{curr.interval}"
-
-    return output
-
-def on_scan(advertisement):
-    global ago
-    global prev
-
-    if advertisement.device.address != mac:
-        return
-
-    if not advertisement.readings:
-        return
-    
-    curr = advertisement.readings
-
-    if ago is None or advertisement.readings.ago < ago: 
-        if prev is None:
-            prev = curr
-
-        curr.temperature = curr.temperature * 9/5 + 32
-
-        term_output = display_readings(prev, curr, DisplayMode.terminal)
-        notif_output = display_readings(prev, curr, DisplayMode.notification)
-
-        print(term_output, end='\r')
-        maybe_notify(prev, curr, notif_output)
-
-        prev = curr
-
-        
-    ago = curr.ago
         
 
-async def main(argv):
-    global ago, prev
-    ago = None
-    prev = None
+def main(argv):
+    monitor = Monitor('config.ini')
 
-    known_age = None
-    offset = 0
-
-    scanner = Aranet4Scanner(on_scan)
-    await scanner.start()
-    while True: # Run forever
-        await asyncio.sleep(1)
-        if prev is not None:
-            # If the scanner finds something new, use that age
-            if known_age is None or known_age != ago:
-                known_age = ago
-                offset = 0
-            offset += 1
-            print(f"  Age:           {known_age + offset}/{prev.interval}" + ' '*5, end='\r')
-    await scanner.stop()
+    try:
+        asyncio.run(monitor.start())
+    except KeyboardInterrupt:
+        print("User interupted.")
 
 
 if __name__== "__main__":
-    mac = ''
-
-    try:
-        asyncio.run(main(sys.argv[1:]))
-    except KeyboardInterrupt:
-        print("User interupted.")
+    main(sys.argv[1:])
