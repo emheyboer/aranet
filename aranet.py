@@ -1,12 +1,11 @@
 #!/usr/bin/env venv/bin/python
 import aranet4
 import sys
-import os
 import tzlocal
 import argparse
 import sqlite3
 import configparser
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 
 class History:
