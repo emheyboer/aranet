@@ -119,9 +119,11 @@ class Monitor:
         
         self.current = advertisement.readings
 
-        if self.last_seen is None or advertisement.readings.ago < self.last_seen: 
         if self.current.interval != self.interval:
             self.interval = self.current.interval
+
+        if self.last_seen is None or advertisement.readings.ago < self.last_seen:
+            self.last_seen = self.current.ago
             self.current.temperature = self.current.temperature * 9/5 + 32
 
             term_output = self.display_readings(DisplayMode.terminal)
@@ -131,9 +133,8 @@ class Monitor:
             self.maybe_notify(notif_output)
 
             self.history.append(self.current)
-
-            
-        self.history.last_seen = self.current.last_seen
+        else:
+            self.last_seen = self.current.ago
 
 
 def colorize(color, text, mode):
