@@ -1,0 +1,12 @@
+# this file should be placed in the same directory as the executable
+# and named config.ini
+
+[aranet]
+# mac address of the aranet device
+mac = 
+
+[pushover]
+# application token
+token =
+# user token 
+user = 
