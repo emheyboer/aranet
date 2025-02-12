@@ -120,6 +120,8 @@ class Monitor:
         self.current = advertisement.readings
 
         if self.last_seen is None or advertisement.readings.ago < self.last_seen: 
+        if self.current.interval != self.interval:
+            self.interval = self.current.interval
             self.current.temperature = self.current.temperature * 9/5 + 32
 
             term_output = self.display_readings(DisplayMode.terminal)
