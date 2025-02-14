@@ -10,3 +10,7 @@ mac =
 token =
 # user token 
 user = 
+
+[history]
+# path to the history sqlite db
+file = records.sqlite

@@ -9,23 +9,35 @@ from datetime import datetime, timezone
 
 
 class History:
-    def __init__(self, *, date_format: str, filename: str, config_file: str):
+    def __init__(self, *, date_format: str, config_file: str, args):
         self.date_format = date_format
-        self.filename = filename
-        self.config = self.load_config(config_file)
+        self.config = self.load_config(config_file, args)
 
         self.create()
         self.last_recorded = self.latest()
 
 
-    def load_config(self, filename):
+    def load_config(self, filename, args):
         config = configparser.ConfigParser()
         config.read(filename)
+
+        if 'aranet' not in config:
+            config['aranet'] = {}
+        if args.mac is not None:
+            config['aranet']['mac'] = args.mac
+
+        if 'history' not in config:
+            config['history'] = {}
+        if args.file is not None:
+            config['history']['file'] = args.file
+        elif 'file' not in config['history']:
+            config['history']['file'] = 'records.sqlite'
+
         return config
 
 
     def stats(self) -> dict:
-        with sqlite3.connect(self.filename) as conn:
+        with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -48,7 +60,7 @@ class History:
 
 
     def latest(self) -> dict:
-        with sqlite3.connect(self.filename) as conn:
+        with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("select * from records order by date desc limit 1")
@@ -113,7 +125,7 @@ class History:
 
 
     def create(self) -> None:
-        with sqlite3.connect(self.filename) as conn:
+        with sqlite3.connect(self.config['history']['file']) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
 create table if not exists records (
@@ -156,7 +168,7 @@ create table if not exists records (
 
 
     def write(self, records: list) -> None:
-        with sqlite3.connect(self.filename) as conn:
+        with sqlite3.connect(self.config['history']['file']) as conn:
             cursor = conn.cursor()
 
             for entry in records:
@@ -174,7 +186,7 @@ def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device', default=True)
-    parser.add_argument('--file', metavar='file_path', help='path to the record file (defaults to records.sqlite)', default='records.sqlite')
+    parser.add_argument('--file', metavar='file_path', help='path to the record file (defaults to records.sqlite)')
     parser.add_argument('--config', metavar='config_path', help='path to the config file (defaults to config.ini)', default='config.ini')
     parser.add_argument('--format', metavar='date_format', help='date format', default='%Y/%m/%d %H:%M:%S')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device')
@@ -211,13 +223,7 @@ def find_device_mac() -> str | None:
 def main():
     args = parse_args(sys.argv[1:])
 
-    history = History(date_format=args.format, filename=args.file, config_file=args.config)
-
-    if 'aranet' not in history.config:
-        history.config['aranet'] = {}
-
-    if args.mac is not None:
-        history.config['aranet']['mac'] = args.mac
+    history = History(date_format=args.format, config_file=args.config, args=args)
 
     # if a MAC address isn't supplied by config or arguments,
     # we can try to scan for bluetooth devices
