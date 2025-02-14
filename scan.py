@@ -1,5 +1,6 @@
 #!/usr/bin/env venv/bin/python
-import http.client, urllib
+import http.client
+import urllib
 import sys
 import asyncio
 from aranet4 import Aranet4Scanner
