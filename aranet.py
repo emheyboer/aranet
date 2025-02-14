@@ -9,8 +9,7 @@ from datetime import datetime, timezone
 
 
 class History:
-    def __init__(self, *, date_format: str, config_file: str, args):
-        self.date_format = date_format
+    def __init__(self, *, config_file: str, args):
         self.config = self.load_config(config_file, args)
 
         self.create()
@@ -18,7 +17,7 @@ class History:
 
 
     def load_config(self, filename, args):
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         config.read(filename)
 
         if 'aranet' not in config:
@@ -32,6 +31,11 @@ class History:
             config['history']['file'] = args.file
         elif 'file' not in config['history']:
             config['history']['file'] = 'records.sqlite'
+
+        if args.format is not None:
+            config['history']['date format'] = args.format
+        elif 'date format' not in config['history']:
+            config['history']['date format'] = '%Y/%m/%d %H:%M:%S'
 
         return config
 
@@ -67,7 +71,8 @@ class History:
             row = cursor.fetchone()
             if row is not None:
                 result = dict(row)
-                result['date'] = datetime.strptime(result['date'], self.date_format).replace(tzinfo=timezone.utc)
+                result['date'] = datetime.strptime(result['date'],
+                    self.config['history']['date format']).replace(tzinfo=timezone.utc)
             else:
                 result = {col: None for col in ['date', 'co2', 'temperature', 'humidity', 'pressure']}
             return result
@@ -102,7 +107,7 @@ class History:
         date = self.last_recorded['date']
         if date is not None:
             tz = tzlocal.get_localzone()
-            date = date.astimezone(tz).strftime(self.date_format)
+            date = date.astimezone(tz).strftime(self.config['history']['date format'])
         else:
             date = 'never'
 
@@ -173,7 +178,7 @@ create table if not exists records (
 
             for entry in records:
                 cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
-                    entry.date.strftime(self.date_format),
+                    entry.date.strftime(self.config['history']['date format']),
                     entry.co2,
                     entry.temperature * 9/5 + 32,  # convert celsius to fahrenheit
                     entry.humidity,
@@ -188,7 +193,7 @@ def parse_args(argv):
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device', default=True)
     parser.add_argument('--file', metavar='file_path', help='path to the record file (defaults to records.sqlite)')
     parser.add_argument('--config', metavar='config_path', help='path to the config file (defaults to config.ini)', default='config.ini')
-    parser.add_argument('--format', metavar='date_format', help='date format', default='%Y/%m/%d %H:%M:%S')
+    parser.add_argument('--format', metavar='date_format', help='date format')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device')
 
     return parser.parse_args(argv)
@@ -223,7 +228,7 @@ def find_device_mac() -> str | None:
 def main():
     args = parse_args(sys.argv[1:])
 
-    history = History(date_format=args.format, config_file=args.config, args=args)
+    history = History(config_file=args.config, args=args)
 
     # if a MAC address isn't supplied by config or arguments,
     # we can try to scan for bluetooth devices

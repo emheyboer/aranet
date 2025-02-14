@@ -14,3 +14,7 @@ user =
 [history]
 # path to the history sqlite db
 file = records.sqlite
+
+# how timestamps should be stored in the db
+# and presented to the user
+date format = %Y/%m/%d %H:%M:%S
