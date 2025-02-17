@@ -167,6 +167,8 @@ create table if not exists records (
             # a record isn't always returned with the same time
             # so (entry.date > latest) may repeat entries
             if (entry.date - latest).total_seconds() > 60:
+                entry.temperature = entry.temperature * 9/5 + 32  # convert celsius to fahrenheit
+
                 new_records.append(entry)
 
         self.write(new_records)
@@ -182,7 +184,7 @@ create table if not exists records (
                 cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
                     entry.date.strftime(self.config['history']['date format']),
                     entry.co2,
-                    entry.temperature * 9/5 + 32,  # convert celsius to fahrenheit
+                    entry.temperature,
                     entry.humidity,
                     entry.pressure,
                 ])
