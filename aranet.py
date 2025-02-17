@@ -5,7 +5,19 @@ import tzlocal
 import argparse
 import sqlite3
 import configparser
-from datetime import datetime, timezone
+import http.client
+import urllib
+import asyncio
+from datetime import datetime, timezone, timedelta
+from enum import Enum
+
+
+class DisplayMode(Enum):
+    """
+    Represents the type of display we're outputting to
+    """
+    terminal = 1
+    notification = 2
 
 
 class History:
@@ -194,6 +206,130 @@ create table if not exists records (
             conn.commit()
 
 
+class Monitor:
+    def __init__(self, config: ConfigParser, history: History):
+        self.last_seen = None
+        self.interval = None
+        self.history = history
+        self.current = None
+        self.config = config
+
+    
+    async def start(self):
+        known_age = None
+        offset = 0
+
+        scanner = aranet.Aranet4Scanner(self.on_scan)
+        await scanner.start()
+        while True: # Run forever
+            await asyncio.sleep(1)
+            if self.current is not None:
+                # If the scanner finds something new, use that age
+                if known_age is None or known_age != self.last_seen:
+                    known_age = self.last_seen
+                    offset = 0
+                offset += 1
+                print(f"  Age:           {known_age + offset}/{self.interval}" + ' '*5, end='\r')
+        await scanner.stop()
+
+
+    def notify(self, title, body, ttl):
+        conn = http.client.HTTPSConnection("api.pushover.net:443")
+        conn.request("POST", "/1/messages.json",
+        urllib.parse.urlencode({
+            "token": self.config['pushover']['token'],
+            "user": self.config['pushover']['user'],
+            "title": title,
+            "message": body,
+            "ttl": ttl,
+            "html": 1,
+        }), { "Content-type": "application/x-www-form-urlencoded" })
+        conn.getresponse()
+
+
+    def show_change(self, prev, curr):
+        if prev is None:
+            prev = curr
+            
+        delta = curr - prev
+        symbol = '⇵'
+        if delta > 0:
+            symbol = '↑'
+        elif delta < 0:
+            symbol = '↓'
+        return f"{symbol} {delta:.01f}"
+
+
+    def maybe_notify(self, body):
+        if not config['monitor'].getboolean('notify'):
+            return
+
+        current = self.current
+        previous = self.history.latest()
+            
+        ttl = self.interval - self.last_seen
+        alerts = []
+        
+        dco2 = current.co2 - (previous.co2 or current.co2)
+        if dco2 > 0 and current.co2 > 1400:
+            alerts.append('rising co2')
+        if current.temperature < 50:
+            alerts.append('low temperature')
+        if current.temperature > 80:
+            alerts.append('high temperature')
+
+        if len(alerts) > 0:
+            title = '; '.join(alerts)
+            self.notify(title, body, max(ttl, 60))
+
+
+    def display_readings(self, mode):
+        current = self.current
+        previous = self.history.latest()
+        color = current.status.name.lower()
+
+        tz = tzlocal.get_localzone()
+
+        output = '\n' if mode == DisplayMode.terminal else ''
+        output += f"  CO2:           {colorize(color, current.co2, mode)} ppm {self.show_change(previous.co2, current.co2)}" + '\n'
+        output += f"  Temperature:   {(current.temperature):.01f} °F {self.show_change(previous.temperature, current.temperature)}" + '\n'
+        output += f"  Humidity:      {current.humidity}% {self.show_change(previous.humidity, current.humidity)}" + '\n'
+        output += f"  Pressure:      {current.pressure:.01f} hPa {self.show_change(previous.pressure, current.pressure)}" + '\n'
+        output += f"  Battery:       {current.battery}%" + '\n'
+        output += f"  Date:          {current.date.astimezone(tz).strftime(self.config['history']['date format'])}" + '\n'
+        output += f"  Age:           {self.last_seen}/{self.interval}"
+
+        return output
+
+
+    def on_scan(self, advertisement):
+        if advertisement.device.address != self.config['aranet']['mac']:
+            return
+
+        if not advertisement.readings:
+            return
+        
+        self.current = advertisement.readings
+
+        if self.current.interval != self.interval:
+            self.interval = self.current.interval
+
+        if self.last_seen is None or advertisement.readings.ago < self.last_seen:
+            self.last_seen = self.current.ago
+            self.current.temperature = self.current.temperature * 9/5 + 32
+            self.current.date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=self.last_seen)
+
+            term_output = self.display_readings(DisplayMode.terminal)
+            notif_output = self.display_readings(DisplayMode.notification)
+
+            print(term_output, end='\r')
+            self.maybe_notify(notif_output)
+
+            self.history.append(self.current)
+        else:
+            self.last_seen = self.current.ago
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
@@ -232,6 +368,28 @@ def find_device_mac() -> str | None:
         return mac
 
     return None
+
+
+def colorize(color: str, text: str, mode: DisplayMode) -> str:
+    colors = {
+        'black': '\x1b[30m{}\x1b[0m',
+        'red': '\x1b[31m{}\x1b[0m',
+        'green': '\x1b[32m{}\x1b[0m',
+        'yellow': '\x1b[33m{}\x1b[0m',
+        'blue': '\x1b[34m{}\x1b[0m',
+        'magenta': '\x1b[35m{}\x1b[0m',
+        'cyan': '\x1b[36m{}\x1b[0m',
+        'white': '\x1b[37m{}\x1b[0m',
+    }
+    color = color.replace('amber', 'yellow')
+    
+    if mode == DisplayMode.notification:
+        result = f"<font color='{color}'>{text}</font>"
+    elif mode == DisplayMode.terminal:
+        result = colors[color].format(text)
+    else:
+        result = text
+    return result
 
 
 def main():
