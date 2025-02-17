@@ -370,7 +370,10 @@ class Monitor:
             print(term_output, end='\r')
             self.maybe_notify(notif_output)
 
-            # self.history.append(self.current)
+            if self.config['history'].getboolean('update'):
+                latest = self.history.latest()
+                if (self.current.date - latest.date).total_seconds() > 60:
+                    self.history.write([self.current])
         else:
             self.last_seen = self.current.ago
 
@@ -451,7 +454,7 @@ def main():
             exit(1)
 
     new_records = None
-    if args.update:
+    if history.config['history'].getboolean('update'):
         new_records = history.update()
 
     history.print(get_stats=args.stats, new_records=new_records)
