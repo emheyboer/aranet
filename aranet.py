@@ -22,11 +22,12 @@ class History:
         config['DEFAULT'] = {
             'file': 'records.sqlite',
             'date format': '%Y/%m/%d %H:%M:%S',
+            'notify': False,
         }
 
         config.read(filename)
 
-        sections = ['aranet', 'pushover', 'history']
+        sections = ['aranet', 'pushover', 'history', 'monitor']
         for section in sections:
             if section not in config:
                 config[section] = {}
@@ -38,6 +39,8 @@ class History:
             config['history']['file'] = args.file
         if args.format is not None:
             config['history']['date format'] = args.format
+        if args.notify is not None:
+            config['monitor']['notify'] = args.notify
 
         return config
 
