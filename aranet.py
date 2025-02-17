@@ -54,7 +54,7 @@ class History:
             'file': 'records.sqlite',
             'date format': '%Y/%m/%d %H:%M:%S',
             'notify': 'False',
-            'update': 'True',
+            'update': 'False',
         }
 
         config.read(filename)

@@ -21,7 +21,7 @@ file = records.sqlite
 date format = %Y/%m/%d %H:%M:%S
 
 # add new readings to the stored history
-update = true
+update = false
 
 [monitor]
 # send notifications for alerts
