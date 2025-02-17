@@ -18,24 +18,26 @@ class History:
 
     def load_config(self, filename, args):
         config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
+
+        config['DEFAULT'] = {
+            'file': 'records.sqlite',
+            'date format': '%Y/%m/%d %H:%M:%S',
+        }
+
         config.read(filename)
 
-        if 'aranet' not in config:
-            config['aranet'] = {}
+        sections = ['aranet', 'pushover', 'history']
+        for section in sections:
+            if section not in config:
+                config[section] = {}
+
+
         if args.mac is not None:
             config['aranet']['mac'] = args.mac
-
-        if 'history' not in config:
-            config['history'] = {}
         if args.file is not None:
             config['history']['file'] = args.file
-        elif 'file' not in config['history']:
-            config['history']['file'] = 'records.sqlite'
-
         if args.format is not None:
             config['history']['date format'] = args.format
-        elif 'date format' not in config['history']:
-            config['history']['date format'] = '%Y/%m/%d %H:%M:%S'
 
         return config
 
