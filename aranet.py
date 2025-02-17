@@ -197,6 +197,8 @@ def parse_args(argv):
     parser.add_argument('--config', metavar='config_path', help='path to the config file (defaults to config.ini)', default='config.ini')
     parser.add_argument('--format', metavar='date_format', help='date format')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device')
+    parser.add_argument('--notify', action=argparse.BooleanOptionalAction, help='send notifcations when appropriate', default=True)
+    parser.add_argument('--monitor', action=argparse.BooleanOptionalAction, help='passively scan for updates', default=False)
 
     return parser.parse_args(argv)
 
