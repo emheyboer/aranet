@@ -34,7 +34,7 @@ class History:
         config['DEFAULT'] = {
             'file': 'records.sqlite',
             'date format': '%Y/%m/%d %H:%M:%S',
-            'notify': False,
+            'notify': 'False',
         }
 
         config.read(filename)
@@ -52,7 +52,7 @@ class History:
         if args.format is not None:
             config['history']['date format'] = args.format
         if args.notify is not None:
-            config['monitor']['notify'] = args.notify
+            config['monitor']['notify'] = str(args.notify)
 
         return config
 
