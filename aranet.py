@@ -54,6 +54,7 @@ class History:
             'file': 'records.sqlite',
             'date format': '%Y/%m/%d %H:%M:%S',
             'notify': 'False',
+            'update': 'True',
         }
 
         config.read(filename)
@@ -72,6 +73,9 @@ class History:
             config['history']['date format'] = args.format
         if args.notify is not None:
             config['monitor']['notify'] = str(args.notify)
+        if args.update is not None:
+            config['history']['update'] = str(args.update)
+
 
         return config
 
@@ -374,7 +378,7 @@ class Monitor:
 def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
-    parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device', default=True)
+    parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device')
     parser.add_argument('--file', metavar='file_path', help='path to the record file (defaults to records.sqlite)')
     parser.add_argument('--config', metavar='config_path', help='path to the config file (defaults to config.ini)', default='config.ini')
     parser.add_argument('--format', metavar='date_format', help='date format')
@@ -454,7 +458,10 @@ def main():
 
     if args.monitor:
         monitor = Monitor(config=history.config, history=history)
-        asyncio.run(monitor.start())
+        try:
+            asyncio.run(monitor.start())
+        except KeyboardInterrupt:
+            print("User interupted.")
 
 
 if __name__ == '__main__':

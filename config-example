@@ -20,6 +20,9 @@ file = records.sqlite
 # so this should be some variation of y/m/d h/m/s for sorting
 date format = %Y/%m/%d %H:%M:%S
 
+# add new readings to the stored history
+update = true
+
 [monitor]
 # send notifications for alerts
 notify = false
