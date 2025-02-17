@@ -20,6 +20,25 @@ class DisplayMode(Enum):
     notification = 2
 
 
+class Reading:
+    """
+    A single sensor reading
+    """
+    def __init__(self, *, date: datetime, co2: float, temperature: float, humidity: float, pressure: float, battery=None, status=None):
+        self.date = date
+        self.co2 = co2
+        self.temperature = temperature
+        self.humidity = humidity
+        self.pressure = pressure
+
+        # optionals
+        self.battery = battery
+        self.status = status
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
 class History:
     def __init__(self, *, config_file: str, args):
         self.config = self.load_config(config_file, args)
@@ -87,11 +106,21 @@ class History:
             cursor.execute("select * from records order by date desc limit 1")
             row = cursor.fetchone()
             if row is not None:
-                result = dict(row)
-                result['date'] = datetime.strptime(result['date'],
-                    self.config['history']['date format']).replace(tzinfo=timezone.utc)
+                result = Reading(
+                    date = datetime.strptime(row['date'], self.config['history']['date format']).replace(tzinfo=timezone.utc),
+                    co2 = row['co2'],
+                    temperature = row['temperature'],
+                    humidity = row['humidity'],
+                    pressure = row['pressure'],
+                )
             else:
-                result = {col: None for col in ['date', 'co2', 'temperature', 'humidity', 'pressure']}
+                result = Reading(
+                    date = None,
+                    co2 = None,
+                    temperature = None,
+                    humidity = None,
+                    pressure = None,
+                )
             return result
 
 
@@ -121,7 +150,7 @@ class History:
 
         print('-'*width)
 
-        date = self.last_recorded['date']
+        date = self.last_recorded.date
         if date is not None:
             tz = tzlocal.get_localzone()
             date = date.astimezone(tz).strftime(self.config['history']['date format'])
@@ -163,7 +192,7 @@ create table if not exists records (
 
 
     def update(self) -> int:
-        latest = self.last_recorded['date'] or datetime.fromtimestamp(0, tz=timezone.utc)
+        latest = self.last_recorded.date or datetime.fromtimestamp(0, tz=timezone.utc)
 
         records = aranet4.client.get_all_records(
             self.config['aranet']['mac'],
@@ -182,32 +211,37 @@ create table if not exists records (
             # a record isn't always returned with the same time
             # so (entry.date > latest) may repeat entries
             if (entry.date - latest).total_seconds() > 60:
-                entry.temperature = entry.temperature * 9/5 + 32  # convert celsius to fahrenheit
-
-                new_records.append(entry)
+                reading = Reading(
+                        date = entry.date,
+                        co2 = entry.co2,
+                        temperature = entry.temperature * 9/5 + 32,  # convert celsius to fahrenheit
+                        humidity = entry.humidity,
+                        pressure = entry.pressure,
+                    )
+                new_records.append(reading)
 
         self.write(new_records)
         self.last_recorded = self.latest()
         return len(new_records)
 
 
-    def write(self, records: list) -> None:
+    def write(self, records: list[Reading]) -> None:
         with sqlite3.connect(self.config['history']['file']) as conn:
             cursor = conn.cursor()
 
-            for entry in records:
+            for reading in records:
                 cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
-                    entry.date.strftime(self.config['history']['date format']),
-                    entry.co2,
-                    entry.temperature,
-                    entry.humidity,
-                    entry.pressure,
+                    reading.date.strftime(self.config['history']['date format']),
+                    reading.co2,
+                    reading.temperature,
+                    reading.humidity,
+                    reading.pressure,
                 ])
             conn.commit()
 
 
 class Monitor:
-    def __init__(self, config: ConfigParser, history: History):
+    def __init__(self, *, config: configparser.ConfigParser, history: History):
         self.last_seen = None
         self.interval = None
         self.history = history
@@ -219,7 +253,7 @@ class Monitor:
         known_age = None
         offset = 0
 
-        scanner = aranet.Aranet4Scanner(self.on_scan)
+        scanner = aranet4.Aranet4Scanner(self.on_scan)
         await scanner.start()
         while True: # Run forever
             await asyncio.sleep(1)
@@ -250,7 +284,7 @@ class Monitor:
     def show_change(self, prev, curr):
         if prev is None:
             prev = curr
-            
+
         delta = curr - prev
         symbol = '⇵'
         if delta > 0:
@@ -261,7 +295,7 @@ class Monitor:
 
 
     def maybe_notify(self, body):
-        if not config['monitor'].getboolean('notify'):
+        if not self.config['monitor'].getboolean('notify'):
             return
 
         current = self.current
@@ -316,8 +350,15 @@ class Monitor:
 
         if self.last_seen is None or advertisement.readings.ago < self.last_seen:
             self.last_seen = self.current.ago
-            self.current.temperature = self.current.temperature * 9/5 + 32
-            self.current.date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=self.last_seen)
+            self.current = Reading(
+                date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=self.last_seen),
+                co2 = self.current.co2,
+                temperature = self.current.temperature * 9/5 + 32,
+                humidity = self.current.humidity,
+                pressure = self.current.pressure,
+                battery = self.current.battery,
+                status = self.current.status
+                )
 
             term_output = self.display_readings(DisplayMode.terminal)
             notif_output = self.display_readings(DisplayMode.notification)
@@ -325,7 +366,7 @@ class Monitor:
             print(term_output, end='\r')
             self.maybe_notify(notif_output)
 
-            self.history.append(self.current)
+            # self.history.append(self.current)
         else:
             self.last_seen = self.current.ago
 
@@ -338,7 +379,7 @@ def parse_args(argv):
     parser.add_argument('--config', metavar='config_path', help='path to the config file (defaults to config.ini)', default='config.ini')
     parser.add_argument('--format', metavar='date_format', help='date format')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device')
-    parser.add_argument('--notify', action=argparse.BooleanOptionalAction, help='send notifcations when appropriate', default=True)
+    parser.add_argument('--notify', action=argparse.BooleanOptionalAction, help='send notifcations when appropriate')
     parser.add_argument('--monitor', action=argparse.BooleanOptionalAction, help='passively scan for updates', default=False)
 
     return parser.parse_args(argv)
@@ -410,6 +451,10 @@ def main():
         new_records = history.update()
 
     history.print(get_stats=args.stats, new_records=new_records)
+
+    if args.monitor:
+        monitor = Monitor(config=history.config, history=history)
+        asyncio.run(monitor.start())
 
 
 if __name__ == '__main__':
