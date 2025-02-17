@@ -6,6 +6,8 @@ import asyncio
 from aranet4 import Aranet4Scanner
 from enum import Enum
 import configparser
+from datetime import datetime, timezone, timedelta
+import tzlocal
 
 
 class DisplayMode(Enum):
@@ -41,7 +43,7 @@ class Monitor:
 
 
     def load_config(self, filename):
-            config = configparser.ConfigParser()
+            config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
             config.read(filename)
             return config
 
@@ -101,15 +103,19 @@ class Monitor:
             previous = current
         color = current.status.name.lower()
 
+        tz = tzlocal.get_localzone()
+
         output = '\n' if mode == DisplayMode.terminal else ''
         output += f"  CO2:           {colorize(color, current.co2, mode)} ppm {self.show_change(previous.co2, current.co2)}" + '\n'
         output += f"  Temperature:   {(current.temperature):.01f} °F {self.show_change(previous.temperature, current.temperature)}" + '\n'
         output += f"  Humidity:      {current.humidity}% {self.show_change(previous.humidity, current.humidity)}" + '\n'
         output += f"  Pressure:      {current.pressure:.01f} hPa {self.show_change(previous.pressure, current.pressure)}" + '\n'
         output += f"  Battery:       {current.battery}%" + '\n'
+        output += f"  Date:          {current.date.astimezone(tz).strftime(self.config['history']['date format'])}" + '\n'
         output += f"  Age:           {self.last_seen}/{self.interval}"
 
         return output
+
 
     def on_scan(self, advertisement):
         if advertisement.device.address != self.config['aranet']['mac']:
@@ -126,6 +132,7 @@ class Monitor:
         if self.last_seen is None or advertisement.readings.ago < self.last_seen:
             self.last_seen = self.current.ago
             self.current.temperature = self.current.temperature * 9/5 + 32
+            self.current.date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=self.last_seen)
 
             term_output = self.display_readings(DisplayMode.terminal)
             notif_output = self.display_readings(DisplayMode.notification)
