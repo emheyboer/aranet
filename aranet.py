@@ -35,19 +35,19 @@ class Reading:
         self.battery = battery
         self.status = status
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str):
         return getattr(self, item)
 
 
 class History:
-    def __init__(self, *, config_file: str, args):
+    def __init__(self, *, config_file: str, args: argparse.Namespace):
         self.config = self.load_config(config_file, args)
 
         self.create()
         self.last_recorded = self.latest()
 
 
-    def load_config(self, filename, args):
+    def load_config(self, filename: str, args: argparse.Namespace) -> configparser.ConfigParser:
         config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
 
         config['DEFAULT'] = {
@@ -103,7 +103,7 @@ class History:
 
 
 
-    def latest(self) -> dict:
+    def latest(self) -> Reading:
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -253,7 +253,7 @@ class Monitor:
         self.config = config
 
     
-    async def start(self):
+    async def start(self) -> None:
         known_age = None
         offset = 0
 
@@ -271,7 +271,7 @@ class Monitor:
         await scanner.stop()
 
 
-    def notify(self, title, body, ttl):
+    def notify(self, title: str, body: str, ttl: int) -> None:
         conn = http.client.HTTPSConnection("api.pushover.net:443")
         conn.request("POST", "/1/messages.json",
         urllib.parse.urlencode({
@@ -285,7 +285,7 @@ class Monitor:
         conn.getresponse()
 
 
-    def show_change(self, prev, curr):
+    def show_change(self, prev: float, curr: float) -> str:
         if prev is None:
             prev = curr
 
@@ -298,7 +298,7 @@ class Monitor:
         return f"{symbol} {delta:.01f}"
 
 
-    def maybe_notify(self, body):
+    def maybe_notify(self, body: str) -> None:
         if not self.config['monitor'].getboolean('notify'):
             return
 
@@ -321,7 +321,7 @@ class Monitor:
             self.notify(title, body, max(ttl, 60))
 
 
-    def display_readings(self, mode):
+    def display_readings(self, mode: DisplayMode) -> str:
         current = self.current
         previous = self.history.latest()
         color = current.status.name.lower()
@@ -340,7 +340,7 @@ class Monitor:
         return output
 
 
-    def on_scan(self, advertisement):
+    def on_scan(self, advertisement) -> None:
         if advertisement.device.address != self.config['aranet']['mac']:
             return
 
@@ -378,7 +378,7 @@ class Monitor:
             self.last_seen = self.current.ago
 
 
-def parse_args(argv):
+def parse_args(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device')
@@ -392,7 +392,7 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-def store_scan_result(advertisement):
+def store_scan_result(advertisement) -> None:
     global devices
     if not advertisement.device:
         return
