@@ -40,6 +40,9 @@ class Reading:
 
 
 class History:
+    """
+    Creates, reads, and updates the history of a device's readings
+    """
     def __init__(self, *, config_file: str, args: argparse.Namespace):
         self.config = self.load_config(config_file, args)
 
@@ -245,6 +248,9 @@ create table if not exists records (
 
 
 class Monitor:
+    """
+    Passively scans for readings from a device
+    """
     def __init__(self, *, config: configparser.ConfigParser, history: History):
         self.last_seen = None
         self.interval = None
@@ -375,7 +381,7 @@ class Monitor:
                 delta = (self.current.date - latest.date).total_seconds() 
                 if 60 < delta < (self.interval + 60):
                     self.history.write([self.current])
-                    
+
         else:
             self.last_seen = self.current.ago
 
