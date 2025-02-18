@@ -372,8 +372,10 @@ class Monitor:
 
             if self.config['history'].getboolean('update'):
                 latest = self.history.latest()
-                if (self.current.date - latest.date).total_seconds() > 60:
+                delta = (self.current.date - latest.date).total_seconds() 
+                if 60 < delta < (self.interval + 60):
                     self.history.write([self.current])
+                    
         else:
             self.last_seen = self.current.ago
 
