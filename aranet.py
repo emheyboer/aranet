@@ -67,7 +67,7 @@ class Reading:
         return f"{symbol} {delta:.01f}"
 
 
-    def display_reading(self, mode: DisplayMode, previous: 'Reading' = None) -> str:
+    def display(self, mode: DisplayMode, previous: 'Reading' = None) -> str:
         """
         Represents the reading as a string suitable for the specified display mode.
         If the previous reading is specified, the change in each value is shown
@@ -81,17 +81,20 @@ class Reading:
                 pressure = None,
             )
 
-
-        color = self.status.name.lower()
-
-        tz = tzlocal.get_localzone()
-
         output = '\n' if mode == DisplayMode.terminal else ''
-        output += f"  CO2:           {colorize(color, self.co2, mode)} ppm {self.show_change(previous.co2, self.co2)}" + '\n'
+
+        co2 = self.co2
+        if self.status is not None:
+            co2 = colorize(self.status.name.lower(), self.co2, mode)
+        output += f"  CO2:           {co2} ppm {self.show_change(previous.co2, self.co2)}" + '\n'
+
         output += f"  Temperature:   {(self.temperature):.01f}°F {self.show_change(previous.temperature, self.temperature)}" + '\n'
         output += f"  Humidity:      {self.humidity}% {self.show_change(previous.humidity, self.humidity)}" + '\n'
         output += f"  Pressure:      {self.pressure:.01f} hPa {self.show_change(previous.pressure, self.pressure)}" + '\n'
-        output += f"  Battery:       {self.battery}%" + '\n'
+
+        if self.battery is not None:
+            output += f"  Battery:       {self.battery}%" + '\n'
+
         output += f"  Age:           {self.age()}"
         if self.interval is not None:
             output += f"/{self.interval}"
@@ -441,8 +444,8 @@ class Monitor:
         # if the reading is new,
         # display and (maybe) add it to the history
         if delta > 60 or is_first_reading:
-            term_output = self.current.display_reading(DisplayMode.terminal, previous = latest)
-            notif_output = self.current.display_reading(DisplayMode.notification, previous = latest)
+            term_output = self.current.display(DisplayMode.terminal, previous=latest)
+            notif_output = self.current.display(DisplayMode.notification, previous=latest)
 
             print(term_output, end='\r')
             self.maybe_notify(notif_output)
