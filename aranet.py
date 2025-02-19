@@ -59,6 +59,9 @@ class History:
 
 
     def load_config(self, filename: str, args: argparse.Namespace) -> configparser.ConfigParser:
+        """
+        Loads config from filename. Any options specified by command line arguments will be overridden
+        """
         config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
 
         config['DEFAULT'] = {
@@ -92,6 +95,10 @@ class History:
 
 
     def stats(self) -> dict:
+        """
+        Returns a dictionary containing mix, max, and mean values for co2, temperature, humidity, and pressure
+        as well as the total number of records.
+        """
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -115,6 +122,9 @@ class History:
 
 
     def latest(self) -> Reading:
+        """
+        Returns the last recorded reading
+        """
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -140,6 +150,10 @@ class History:
 
 
     def print_table(self, stats: dict, width: int) -> None:
+        """
+        Prints a table containing the min, max, mean, and last recorded values for each column.
+        Omitted rows will be skipped. Omitted values will be replaced with 'x'
+        """
         print(f"{"temp  humid  press    co2":>34}")
         columns = [  # (name, suffix)
             ('temperature', '°'),
@@ -161,6 +175,10 @@ class History:
 
 
     def print(self, get_stats=True, new_records=None) -> None:
+        """
+        Prints the table and other information for the user.
+        If get_stats == False, the min, max, and mean rows will be omitted
+        """
         width = 34
 
         print('-'*width)
@@ -191,6 +209,9 @@ class History:
 
 
     def create(self) -> None:
+        """
+        Creates both the sqlite db and the records table if they don't already exist
+        """
         with sqlite3.connect(self.config['history']['file']) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -207,6 +228,10 @@ create table if not exists records (
 
 
     def update(self) -> int:
+        """
+        Connects to the aranet device to request all records since the last recorded reading.
+        Returns the number of new records
+        """
         latest = self.last_recorded.date or datetime.fromtimestamp(0, tz=timezone.utc)
 
         records = aranet4.client.get_all_records(
@@ -241,6 +266,9 @@ create table if not exists records (
 
 
     def write(self, records: list[Reading]) -> None:
+        """
+        Writes records to the sqlite db
+        """
         with sqlite3.connect(self.config['history']['file']) as conn:
             cursor = conn.cursor()
 
@@ -267,6 +295,9 @@ class Monitor:
 
     
     async def start(self) -> None:
+        """
+        Starts the scanner and updates the displayed age of the current reading
+        """
         known_age = None
         offset = 0
 
@@ -280,6 +311,10 @@ class Monitor:
 
 
     def notify(self, title: str, body: str, ttl: int) -> None:
+        """
+        Sends a notification to the user which will disappear after ttl.
+        Uses app and user tokens from config 
+        """
         conn = http.client.HTTPSConnection("api.pushover.net:443")
         conn.request("POST", "/1/messages.json",
         urllib.parse.urlencode({
@@ -294,6 +329,9 @@ class Monitor:
 
 
     def show_change(self, prev: float, curr: float) -> str:
+        """
+        Visually indicates the change in a value
+        """
         if prev is None:
             prev = curr
 
@@ -307,6 +345,9 @@ class Monitor:
 
 
     def maybe_notify(self, body: str) -> None:
+        """
+        Dertermine whether to alert the user and, if so, what alerts to send and for how long
+        """
         if not self.config['monitor'].getboolean('notify'):
             return
 
@@ -329,7 +370,10 @@ class Monitor:
             self.notify(title, body, max(ttl, 60))
 
 
-    def display_readings(self, mode: DisplayMode) -> str:
+    def display_reading(self, mode: DisplayMode) -> str:
+        """
+        Represents the reading a string suitable for the specified display mode
+        """
         current = self.current
         previous = self.history.latest()
         color = current.status.name.lower()
@@ -349,6 +393,10 @@ class Monitor:
 
 
     def on_scan(self, advertisement) -> None:
+        """
+        Responds to each new reading from the scanner.
+        New distinct readings are displayed and (potentially) written to the history
+        """
         if advertisement.device.address != self.config['aranet']['mac']:
             return
 
@@ -378,8 +426,8 @@ class Monitor:
         # if the reading is new,
         # display and (maybe) add it to the history
         if delta > 60 or is_first_reading:
-            term_output = self.display_readings(DisplayMode.terminal)
-            notif_output = self.display_readings(DisplayMode.notification)
+            term_output = self.display_reading(DisplayMode.terminal)
+            notif_output = self.display_reading(DisplayMode.notification)
 
             print(term_output, end='\r')
             self.maybe_notify(notif_output)
@@ -389,6 +437,9 @@ class Monitor:
 
 
 def parse_args(argv) -> argparse.Namespace:
+    """
+    Parses command line arguments. All arguments without a default exist as config-file options
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device')
@@ -411,6 +462,10 @@ def store_scan_result(advertisement) -> None:
 
 
 def find_device_mac() -> str | None:
+    """
+    Starts a scanner to identify nearby aranet devices.
+    If exactly one is found, return its address
+    """
     global devices
 
     print('No MAC address supplied. Scanning for devices...')
@@ -429,6 +484,9 @@ def find_device_mac() -> str | None:
 
 
 def colorize(color: str, text: str, mode: DisplayMode) -> str:
+    """
+    Colors text for the specified display mode
+    """
     colors = {
         'black': '\x1b[30m{}\x1b[0m',
         'red': '\x1b[31m{}\x1b[0m',
