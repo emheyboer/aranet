@@ -268,12 +268,8 @@ class Monitor:
         while True: # Run forever
             await asyncio.sleep(1)
             if self.current is not None:
-                # If the scanner finds something new, use that age
-                if known_age is None or known_age != self.last_seen:
-                    known_age = self.last_seen
-                    offset = 0
-                offset += 1
-                print(f"  Age:           {known_age + offset}/{self.interval}" + ' '*5, end='\r')
+                age = round((datetime.now().astimezone(timezone.utc) - self.current.date).total_seconds())
+                print(f"  Age:           {age}/{self.interval}" + ' '*5, end='\r')
         await scanner.stop()
 
 
@@ -353,21 +349,21 @@ class Monitor:
         if not advertisement.readings:
             return
         
-        self.current = advertisement.readings
+        current = advertisement.readings
 
-        if self.current.interval != self.interval:
-            self.interval = self.current.interval
+        if current.interval != self.interval:
+            self.interval = current.interval
 
         if self.last_seen is None or advertisement.readings.ago < self.last_seen:
-            self.last_seen = self.current.ago
+            self.last_seen = current.ago
             self.current = Reading(
                 date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=self.last_seen),
-                co2 = self.current.co2,
-                temperature = self.current.temperature * 9/5 + 32,
-                humidity = self.current.humidity,
-                pressure = self.current.pressure,
-                battery = self.current.battery,
-                status = self.current.status
+                co2 = current.co2,
+                temperature = current.temperature * 9/5 + 32,
+                humidity = current.humidity,
+                pressure = current.pressure,
+                battery = current.battery,
+                status = current.status
                 )
 
             term_output = self.display_readings(DisplayMode.terminal)
@@ -383,7 +379,7 @@ class Monitor:
                     self.history.write([self.current])
 
         else:
-            self.last_seen = self.current.ago
+            self.last_seen = current.ago
 
 
 def parse_args(argv) -> argparse.Namespace:
