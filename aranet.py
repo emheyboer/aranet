@@ -38,6 +38,14 @@ class Reading:
     def __getitem__(self, item: str):
         return getattr(self, item)
 
+    def age(self) -> int:
+        """
+        Number of seconds since this reading was taken
+        """
+        now = datetime.now().astimezone(timezone.utc)
+        delta = now - self.date
+        return round(delta.total_seconds())
+
 
 class History:
     """
@@ -252,7 +260,6 @@ class Monitor:
     Passively scans for readings from a device
     """
     def __init__(self, *, config: configparser.ConfigParser, history: History):
-        self.last_seen = None
         self.interval = None
         self.history = history
         self.current = None
@@ -268,8 +275,7 @@ class Monitor:
         while True: # Run forever
             await asyncio.sleep(1)
             if self.current is not None:
-                age = round((datetime.now().astimezone(timezone.utc) - self.current.date).total_seconds())
-                print(f"  Age:           {age}/{self.interval}" + ' '*5, end='\r')
+                print(f"  Age:           {self.current.age()}/{self.interval}" + ' '*5, end='\r')
         await scanner.stop()
 
 
@@ -307,7 +313,7 @@ class Monitor:
         current = self.current
         previous = self.history.latest()
             
-        ttl = self.interval - self.last_seen
+        ttl = self.interval - self.current.age()
         alerts = []
         
         dco2 = current.co2 - (previous.co2 or current.co2)
@@ -337,7 +343,7 @@ class Monitor:
         output += f"  Pressure:      {current.pressure:.01f} hPa {self.show_change(previous.pressure, current.pressure)}" + '\n'
         output += f"  Battery:       {current.battery}%" + '\n'
         output += f"  Date:          {current.date.astimezone(tz).strftime(self.config['history']['date format'])}" + '\n'
-        output += f"  Age:           {self.last_seen}/{self.interval}"
+        output += f"  Age:           {current.age()}/{self.interval}"
 
         return output
 
@@ -354,32 +360,32 @@ class Monitor:
         if current.interval != self.interval:
             self.interval = current.interval
 
-        if self.last_seen is None or advertisement.readings.ago < self.last_seen:
-            self.last_seen = current.ago
-            self.current = Reading(
-                date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=self.last_seen),
-                co2 = current.co2,
-                temperature = current.temperature * 9/5 + 32,
-                humidity = current.humidity,
-                pressure = current.pressure,
-                battery = current.battery,
-                status = current.status
-                )
+        is_first_reading = self.current is None
 
+        self.current = Reading(
+            date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=current.ago),
+            co2 = current.co2,
+            temperature = current.temperature * 9/5 + 32,
+            humidity = current.humidity,
+            pressure = current.pressure,
+            battery = current.battery,
+            status = current.status,
+            )
+
+        latest = self.history.latest()
+        delta = (self.current.date - latest.date).total_seconds() 
+
+        # if the reading is new,
+        # display and (maybe) add it to the history
+        if delta > 60 or is_first_reading:
             term_output = self.display_readings(DisplayMode.terminal)
             notif_output = self.display_readings(DisplayMode.notification)
 
             print(term_output, end='\r')
             self.maybe_notify(notif_output)
 
-            if self.config['history'].getboolean('update'):
-                latest = self.history.latest()
-                delta = (self.current.date - latest.date).total_seconds() 
-                if 60 < delta < (self.interval + 60):
+            if self.config['history'].getboolean('update') and delta < (self.interval + 60):
                     self.history.write([self.current])
-
-        else:
-            self.last_seen = current.ago
 
 
 def parse_args(argv) -> argparse.Namespace:
