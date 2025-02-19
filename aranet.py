@@ -37,6 +37,7 @@ class Reading:
         self.status = status
         self.interval = interval
 
+
     def __getitem__(self, item: str):
         return getattr(self, item)
 
@@ -68,7 +69,7 @@ class Reading:
 
     def display_reading(self, mode: DisplayMode, previous: 'Reading' = None) -> str:
         """
-        Represents the reading a string suitable for the specified display mode.
+        Represents the reading as a string suitable for the specified display mode.
         If the previous reading is specified, the change in each value is shown
         """
         if previous is None:
@@ -87,7 +88,7 @@ class Reading:
 
         output = '\n' if mode == DisplayMode.terminal else ''
         output += f"  CO2:           {colorize(color, self.co2, mode)} ppm {self.show_change(previous.co2, self.co2)}" + '\n'
-        output += f"  Temperature:   {(self.temperature):.01f} °F {self.show_change(previous.temperature, self.temperature)}" + '\n'
+        output += f"  Temperature:   {(self.temperature):.01f}°F {self.show_change(previous.temperature, self.temperature)}" + '\n'
         output += f"  Humidity:      {self.humidity}% {self.show_change(previous.humidity, self.humidity)}" + '\n'
         output += f"  Pressure:      {self.pressure:.01f} hPa {self.show_change(previous.pressure, self.pressure)}" + '\n'
         output += f"  Battery:       {self.battery}%" + '\n'
