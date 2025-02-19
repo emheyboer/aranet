@@ -313,7 +313,6 @@ create table if not exists records (
                 new_records.append(reading)
 
         self.write(new_records)
-        self.last_recorded = self.latest()
         return len(new_records)
 
 
@@ -333,6 +332,7 @@ create table if not exists records (
                     reading.pressure,
                 ])
             conn.commit()
+        self.last_recorded = self.latest()
 
 
 class Monitor:
@@ -388,7 +388,7 @@ class Monitor:
             return
 
         current = self.current
-        previous = self.history.latest()
+        previous = self.history.last_recorded
             
         ttl = self.interval - self.current.age()
         alerts = []
@@ -435,7 +435,7 @@ class Monitor:
             interval = current.interval
             )
 
-        latest = self.history.latest()
+        latest = self.history.last_recorded
         delta = (self.current.date - latest.date).total_seconds() 
 
         # if the reading is new,
