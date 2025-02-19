@@ -24,7 +24,8 @@ class Reading:
     """
     A single sensor reading
     """
-    def __init__(self, *, date: datetime, co2: float, temperature: float, humidity: float, pressure: float, battery=None, status=None):
+    def __init__(self, *, date: datetime, co2: float, temperature: float, humidity: float, pressure: float,
+        battery: float = None, status = None, interval: int = None):
         self.date = date
         self.co2 = co2
         self.temperature = temperature
@@ -34,9 +35,11 @@ class Reading:
         # optionals
         self.battery = battery
         self.status = status
+        self.interval = interval
 
     def __getitem__(self, item: str):
         return getattr(self, item)
+
 
     def age(self) -> int:
         """
@@ -45,6 +48,54 @@ class Reading:
         now = datetime.now().astimezone(timezone.utc)
         delta = now - self.date
         return round(delta.total_seconds())
+
+
+    def show_change(self, prev: float, curr: float) -> str:
+        """
+        Visually indicates the change in a value
+        """
+        if prev is None:
+            prev = curr
+
+        delta = curr - prev
+        symbol = '⇵'
+        if delta > 0:
+            symbol = '↑'
+        elif delta < 0:
+            symbol = '↓'
+        return f"{symbol} {delta:.01f}"
+
+
+    def display_reading(self, mode: DisplayMode, previous: 'Reading' = None) -> str:
+        """
+        Represents the reading a string suitable for the specified display mode.
+        If the previous reading is specified, the change in each value is shown
+        """
+        if previous is None:
+            previous = Reading(
+                date = None,
+                co2 = None,
+                temperature = None,
+                humidity = None,
+                pressure = None,
+            )
+
+
+        color = self.status.name.lower()
+
+        tz = tzlocal.get_localzone()
+
+        output = '\n' if mode == DisplayMode.terminal else ''
+        output += f"  CO2:           {colorize(color, self.co2, mode)} ppm {self.show_change(previous.co2, self.co2)}" + '\n'
+        output += f"  Temperature:   {(self.temperature):.01f} °F {self.show_change(previous.temperature, self.temperature)}" + '\n'
+        output += f"  Humidity:      {self.humidity}% {self.show_change(previous.humidity, self.humidity)}" + '\n'
+        output += f"  Pressure:      {self.pressure:.01f} hPa {self.show_change(previous.pressure, self.pressure)}" + '\n'
+        output += f"  Battery:       {self.battery}%" + '\n'
+        output += f"  Age:           {self.age()}"
+        if self.interval is not None:
+            output += f"/{self.interval}"
+
+        return output
 
 
 class History:
@@ -328,22 +379,6 @@ class Monitor:
         conn.getresponse()
 
 
-    def show_change(self, prev: float, curr: float) -> str:
-        """
-        Visually indicates the change in a value
-        """
-        if prev is None:
-            prev = curr
-
-        delta = curr - prev
-        symbol = '⇵'
-        if delta > 0:
-            symbol = '↑'
-        elif delta < 0:
-            symbol = '↓'
-        return f"{symbol} {delta:.01f}"
-
-
     def maybe_notify(self, body: str) -> None:
         """
         Dertermine whether to alert the user and, if so, what alerts to send and for how long
@@ -368,28 +403,6 @@ class Monitor:
         if len(alerts) > 0:
             title = '; '.join(alerts)
             self.notify(title, body, max(ttl, 60))
-
-
-    def display_reading(self, mode: DisplayMode) -> str:
-        """
-        Represents the reading a string suitable for the specified display mode
-        """
-        current = self.current
-        previous = self.history.latest()
-        color = current.status.name.lower()
-
-        tz = tzlocal.get_localzone()
-
-        output = '\n' if mode == DisplayMode.terminal else ''
-        output += f"  CO2:           {colorize(color, current.co2, mode)} ppm {self.show_change(previous.co2, current.co2)}" + '\n'
-        output += f"  Temperature:   {(current.temperature):.01f} °F {self.show_change(previous.temperature, current.temperature)}" + '\n'
-        output += f"  Humidity:      {current.humidity}% {self.show_change(previous.humidity, current.humidity)}" + '\n'
-        output += f"  Pressure:      {current.pressure:.01f} hPa {self.show_change(previous.pressure, current.pressure)}" + '\n'
-        output += f"  Battery:       {current.battery}%" + '\n'
-        output += f"  Date:          {current.date.astimezone(tz).strftime(self.config['history']['date format'])}" + '\n'
-        output += f"  Age:           {current.age()}/{self.interval}"
-
-        return output
 
 
     def on_scan(self, advertisement) -> None:
@@ -418,6 +431,7 @@ class Monitor:
             pressure = current.pressure,
             battery = current.battery,
             status = current.status,
+            interval = current.interval
             )
 
         latest = self.history.latest()
@@ -426,13 +440,13 @@ class Monitor:
         # if the reading is new,
         # display and (maybe) add it to the history
         if delta > 60 or is_first_reading:
-            term_output = self.display_reading(DisplayMode.terminal)
-            notif_output = self.display_reading(DisplayMode.notification)
+            term_output = self.current.display_reading(DisplayMode.terminal, previous = latest)
+            notif_output = self.current.display_reading(DisplayMode.notification, previous = latest)
 
             print(term_output, end='\r')
             self.maybe_notify(notif_output)
 
-            if self.config['history'].getboolean('update') and delta < (self.interval + 60):
+            if self.config['history'].getboolean('update') and 60 < delta < (self.interval + 60):
                     self.history.write([self.current])
 
 
