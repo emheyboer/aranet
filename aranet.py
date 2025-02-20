@@ -67,39 +67,60 @@ class Reading:
         return f"{symbol} {delta:.01f}"
 
 
-    def display(self, mode: DisplayMode, previous: 'Reading' = None) -> str:
+    def display(self, mode: DisplayMode, previous: 'Reading' = None,
+                history: 'History' = None) -> str:
         """
         Represents the reading as a string suitable for the specified display mode.
         If the previous reading is specified, the change in each value is shown
         """
-        if previous is None:
-            previous = Reading(
-                date = None,
-                co2 = None,
-                temperature = None,
-                humidity = None,
-                pressure = None,
-            )
-
         output = '\n' if mode == DisplayMode.terminal else ''
+        lines = []
 
         co2 = self.co2
         if self.status is not None:
             co2 = colorize(self.status.name.lower(), self.co2, mode)
-        output += f"  CO2:           {co2} ppm {self.show_change(previous.co2, self.co2)}" + '\n'
+        line = f"  CO2:           {co2} ppm"
+        if previous is not None:
+            line += f" {self.show_change(previous.co2, self.co2)}"
+        if history is not None:
+            line += f" {history.ranking('co2', self.co2)} place"
+            line += f" {history.percentile('co2', self.co2)} percentile"
+        lines.append(line)
 
-        output += f"  Temperature:   {(self.temperature):.01f}°F {self.show_change(previous.temperature, self.temperature)}" + '\n'
-        output += f"  Humidity:      {self.humidity}% {self.show_change(previous.humidity, self.humidity)}" + '\n'
-        output += f"  Pressure:      {self.pressure:.01f} hPa {self.show_change(previous.pressure, self.pressure)}" + '\n'
+        line = f"  Temperature:   {(self.temperature):.01f}°F"
+        if previous is not None:
+            line += f" {self.show_change(previous.temperature, self.temperature)}"
+        if history is not None:
+            line += f" {history.ranking('temperature', self.temperature)} place"
+            line += f" {history.percentile('temperature', self.temperature)} percentile"
+        lines.append(line)
+
+        line = f"  Humidity:      {self.humidity}%"
+        if previous is not None:
+            line += f" {self.show_change(previous.humidity, self.humidity)}"
+        if history is not None:
+            line += f" {history.ranking('humidity', self.humidity)} place"
+            line += f" {history.percentile('humidity', self.humidity)} percentile"
+        lines.append(line)
+
+        line = f"  Pressure:      {self.pressure:.01f} hPa"
+        if previous is not None:
+            line += f" {self.show_change(previous.pressure, self.pressure)}"
+        if history is not None:
+            line += f" {history.ranking('pressure', self.pressure)} place"
+            line += f" {history.percentile('pressure', self.pressure)} percentile"
+        lines.append(line)
 
         if self.battery is not None:
-            output += f"  Battery:       {self.battery}%" + '\n'
+            line = f"  Battery:       {self.battery}%"
+            lines.append(line)
 
-        output += f"  Age:           {self.age()}"
+        line = f"  Age:           {self.age()}"
         if self.interval is not None:
-            output += f"/{self.interval}"
+            lines += f"/{self.interval}"
+        lines.append(line)
 
-        return output
+        return output + "\n".join(lines)
 
 
 class History:
