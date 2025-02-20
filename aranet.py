@@ -290,7 +290,7 @@ class History:
         self.print_table(stats, width)
 
         print(self.last_recorded.display(DisplayMode.terminal,
-            history=self if get_stats else None))
+            history=self if get_stats else None), end='\r')
 
 
     def create(self) -> None:
