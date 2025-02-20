@@ -395,21 +395,24 @@ class Monitor:
         await scanner.stop()
 
 
-    def notify(self, title: str, body: str, ttl: int) -> None:
+    def notify(self, title: str, body: str, ttl: int = None) -> None:
         """
         Sends a notification to the user which will disappear after ttl.
         Uses app and user tokens from config 
         """
-        conn = http.client.HTTPSConnection("api.pushover.net:443")
-        conn.request("POST", "/1/messages.json",
-        urllib.parse.urlencode({
+        form = {
             "token": self.config['pushover']['token'],
             "user": self.config['pushover']['user'],
             "title": title,
             "message": body,
-            "ttl": ttl,
             "html": 1,
-        }), { "Content-type": "application/x-www-form-urlencoded" })
+        }
+        if ttl is not None:
+            form["ttl"] = ttl
+
+        conn = http.client.HTTPSConnection("api.pushover.net:443")
+        conn.request("POST", "/1/messages.json",
+            urllib.parse.urlencode(form), { "Content-type": "application/x-www-form-urlencoded" })
         conn.getresponse()
 
 
@@ -423,7 +426,8 @@ class Monitor:
         current = self.current
         previous = self.history.last_recorded
             
-        ttl = self.interval - self.current.age()
+        ttl = max(self.interval - self.current.age(), 60)
+        should_expire = True
         alerts = []
         
         dco2 = current.co2 - (previous.co2 or current.co2)
@@ -437,10 +441,13 @@ class Monitor:
             rank = self.history.ranking(col, current[col])
             if rank == '1st':
                 alerts.append(f"new {col} high score")
+                should_expire = False
 
         if len(alerts) > 0:
             title = '; '.join(alerts)
-            self.notify(title, body, max(ttl, 60))
+            if not should_expire:
+                ttl = None
+            self.notify(title, body, ttl=ttl)
 
 
     def on_scan(self, advertisement) -> None:
