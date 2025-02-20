@@ -372,6 +372,9 @@ create table if not exists records (
 
 
     def ranking(self, column: str, value: float) -> str:
+        """
+        Returns a string indicating that ranking of the value
+        """
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -392,6 +395,9 @@ create table if not exists records (
 
 
     def percentile(self, column: str, value: float) -> str: 
+        """
+        Returns a string indicating which percentile the value falls in
+        """
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
