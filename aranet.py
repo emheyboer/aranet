@@ -117,7 +117,7 @@ class Reading:
 
         line = f"  Age:           {self.age()}"
         if self.interval is not None:
-            lines += f"/{self.interval}"
+            line += f"/{self.interval}"
         lines.append(line)
 
         return output + "\n".join(lines)
