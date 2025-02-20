@@ -364,8 +364,35 @@ create table if not exists records (
                 suffix = 'rd'
             else:
                 suffix = 'th'
-            return str(rank) + suffix
+            return f"{rank:,}{suffix}"
 
+
+    def percentile(self, column: str, value: float) -> str: 
+        with sqlite3.connect(self.config['history']['file']) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(f"select count(*) as count from records where {column} < ?", [value])
+            row = cursor.fetchone()
+            count = row['count'] + 1
+
+            cursor.execute(f"select count(*) as total from records")
+            row = cursor.fetchone()
+            total = row['total']
+
+            percentile = count / total * 100
+
+            percentile = round(percentile)
+
+            rightmost_digit = percentile % 10
+            if rightmost_digit == 1:
+                suffix = 'st'
+            elif rightmost_digit == 2:
+                suffix = 'nd'
+            elif rightmost_digit == 3:
+                suffix = 'rd'
+            else:
+                suffix = 'th'
+            return f"{percentile:,}{suffix}"
 
 
 class Monitor:
