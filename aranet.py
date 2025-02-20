@@ -486,24 +486,21 @@ def parse_args(argv) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def store_scan_result(advertisement) -> None:
-    global devices
-    if not advertisement.device:
-        return
-
-    devices.add(advertisement.device.address)
-
 
 def find_device_mac() -> str | None:
     """
     Starts a scanner to identify nearby aranet devices.
     If exactly one is found, return its address
     """
-    global devices
-
     print('No MAC address supplied. Scanning for devices...')
 
     devices = set()
+
+    def store_scan_result(advertisement) -> None:
+        if not advertisement.device:
+            return
+        devices.add(advertisement.device.address)
+
     aranet4.client.find_nearby(store_scan_result)
 
     print(f"Found {len(devices)} device(s)")
