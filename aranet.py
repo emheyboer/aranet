@@ -448,7 +448,7 @@ class Monitor:
             )
 
         latest = self.history.last_recorded
-        delta = (self.current.date - latest.date).total_seconds() 
+        delta = (self.current.date - (latest.date or datetime.fromtimestamp(0, tz=timezone.utc))).total_seconds() 
 
         # if the reading is new,
         # display and (maybe) add it to the history
@@ -547,10 +547,11 @@ def main():
     # we can try to scan for bluetooth devices
     needs_mac = history.config['history'].getboolean('update') or history.config['monitor'].getboolean('monitor')
     if 'mac' not in history.config['aranet'] and needs_mac:
-        history.config['aranet']['mac'] = find_device_mac()
-        if history.config['aranet']['mac'] is None:
+        mac = find_device_mac()
+        if mac is None:
             print('Unable to get device MAC address')
             exit(1)
+        history.config['aranet']['mac'] = mac
 
     new_records = None
     if history.config['history'].getboolean('update'):
