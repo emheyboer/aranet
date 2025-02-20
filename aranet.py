@@ -110,6 +110,9 @@ class History:
         self.config = self.load_config(config_file, args)
 
         self.create()
+
+        # last_recorded stores the last known reading even if it hasn't been written to the history
+        # this is overridden whenver write() is called
         self.last_recorded = self.latest()
 
 
@@ -290,7 +293,10 @@ create table if not exists records (
         Connects to the aranet device to request all records since the last recorded reading.
         Returns the number of new records
         """
-        latest = self.last_recorded.date or datetime.fromtimestamp(0, tz=timezone.utc)
+
+        # we use latest() instead of last_recorded to ensure
+        # that there are never gaps in the history
+        latest = self.latest().date or datetime.fromtimestamp(0, tz=timezone.utc)
 
         records = aranet4.client.get_all_records(
             self.config['aranet']['mac'],
@@ -453,8 +459,14 @@ class Monitor:
             print(term_output, end='\r')
             self.maybe_notify(notif_output)
 
-            if self.config['history'].getboolean('update') and 60 < delta < (self.interval + 60):
-                    self.history.write([self.current])
+            # a new distinct reading
+            if 60 < delta:
+                # if we're writing to the history, we have to ensure that there are no gaps
+                # delta > (self.interval + 60) indicates that we've missed at least one reading
+                if self.config['history'].getboolean('update') and  delta < (self.interval + 60):
+                        self.history.write([self.current])
+                else:
+                    self.history.last_recorded = self.current
 
 
 def parse_args(argv) -> argparse.Namespace:
