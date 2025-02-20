@@ -487,7 +487,7 @@ def parse_args(argv) -> argparse.Namespace:
 
 
 
-def find_device_mac() -> str | None:
+def find_device() -> str | None:
     """
     Starts a scanner to identify nearby aranet devices.
     If exactly one is found, return its address
@@ -499,16 +499,18 @@ def find_device_mac() -> str | None:
     def store_scan_result(advertisement) -> None:
         if not advertisement.device:
             return
-        devices.add(advertisement.device.address)
+        devices.add(advertisement.device)
 
-    aranet4.client.find_nearby(store_scan_result)
+    aranet4.client.find_nearby(store_scan_result, duration=30)
 
     print(f"Found {len(devices)} device(s)")
 
+    for device in devices:
+        print(f"name = {device.name} mac = {device.address}")
+
     if len(devices) == 1:
-        mac = devices.pop()
-        print(f"mac = {mac}")
-        return mac
+        device = devices.pop()
+        return device.address
 
     return None
 
@@ -547,7 +549,7 @@ def main():
     # we can try to scan for bluetooth devices
     needs_mac = history.config['history'].getboolean('update') or history.config['monitor'].getboolean('monitor')
     if 'mac' not in history.config['aranet'] and needs_mac:
-        mac = find_device_mac()
+        mac = find_device()
         if mac is None:
             print('Unable to get device MAC address')
             exit(1)
