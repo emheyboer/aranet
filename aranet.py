@@ -289,6 +289,9 @@ class History:
 
         self.print_table(stats, width)
 
+        print(self.last_recorded.display(DisplayMode.terminal,
+            history=self if get_stats else None))
+
 
     def create(self) -> None:
         """
@@ -514,8 +517,6 @@ class Monitor:
         if current.interval != self.interval:
             self.interval = current.interval
 
-        is_first_reading = self.current is None
-
         self.current = Reading(
             date = datetime.now().astimezone(timezone.utc) - timedelta(seconds=current.ago),
             co2 = current.co2,
@@ -532,7 +533,7 @@ class Monitor:
 
         # if the reading is new,
         # display and (maybe) add it to the history
-        if delta > 60 or is_first_reading:
+        if delta > 60:
             term_output = self.current.display(DisplayMode.terminal, previous=latest)
             notif_output = self.current.display(DisplayMode.notification, previous=latest)
 
