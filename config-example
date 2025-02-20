@@ -26,3 +26,6 @@ update = false
 [monitor]
 # send notifications for alerts
 notify = false
+
+# passively scan for new readings
+monitor = false

@@ -124,6 +124,7 @@ class History:
             'date format': '%Y/%m/%d %H:%M:%S',
             'notify': 'False',
             'update': 'False',
+            'monitor': 'False',
         }
 
         config.read(filename)
@@ -144,6 +145,8 @@ class History:
             config['monitor']['notify'] = str(args.notify)
         if args.update is not None:
             config['history']['update'] = str(args.update)
+        if args.monitor is not None:
+            config['monitor']['monitor'] = str(args.monitor)
 
 
         return config
@@ -466,7 +469,7 @@ def parse_args(argv) -> argparse.Namespace:
     parser.add_argument('--format', metavar='date_format', help='date format')
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device')
     parser.add_argument('--notify', action=argparse.BooleanOptionalAction, help='send notifcations when appropriate')
-    parser.add_argument('--monitor', action=argparse.BooleanOptionalAction, help='passively scan for updates', default=False)
+    parser.add_argument('--monitor', action=argparse.BooleanOptionalAction, help='passively scan for updates')
 
     return parser.parse_args(argv)
 
@@ -533,7 +536,8 @@ def main():
 
     # if a MAC address isn't supplied by config or arguments,
     # we can try to scan for bluetooth devices
-    if 'mac' not in history.config['aranet']:
+    needs_mac = history.config['history'].getboolean('update') or history.config['monitor'].getboolean('monitor')
+    if 'mac' not in history.config['aranet'] and needs_mac:
         history.config['aranet']['mac'] = find_device_mac()
         if history.config['aranet']['mac'] is None:
             print('Unable to get device MAC address')
@@ -545,7 +549,7 @@ def main():
 
     history.print(get_stats=args.stats, new_records=new_records)
 
-    if args.monitor:
+    if history.config['monitor'].getboolean('monitor'):
         monitor = Monitor(config=history.config, history=history)
         try:
             asyncio.run(monitor.start())
