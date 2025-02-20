@@ -433,6 +433,10 @@ class Monitor:
             alerts.append('low temperature')
         if current.temperature > 80:
             alerts.append('high temperature')
+        for col in ['co2', 'temperature', 'humidity', 'pressure']:
+            rank = self.history.ranking(col, current[col])
+            if rank == '1st':
+                alerts.append(f"new {col} high score")
 
         if len(alerts) > 0:
             title = '; '.join(alerts)
