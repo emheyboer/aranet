@@ -347,6 +347,27 @@ create table if not exists records (
         self.last_recorded = self.latest()
 
 
+    def ranking(self, column: str, value: float) -> str:
+        with sqlite3.connect(self.config['history']['file']) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(f"select count(*) as count from records where {column} > ?", [value])
+            row = cursor.fetchone()
+            rank = row['count'] + 1
+
+            rightmost_digit = rank % 10
+            if rightmost_digit == 1:
+                suffix = 'st'
+            elif rightmost_digit == 2:
+                suffix = 'nd'
+            elif rightmost_digit == 3:
+                suffix = 'rd'
+            else:
+                suffix = 'th'
+            return str(rank) + suffix
+
+
+
 class Monitor:
     """
     Passively scans for readings from a device
