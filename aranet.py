@@ -173,7 +173,7 @@ class History:
 
     def stats(self) -> dict:
         """
-        Returns a dictionary containing mix, max, and mean values for co2, temperature, humidity, and pressure
+        Returns a dictionary containing min, max, and mean values for co2, temperature, humidity, and pressure
         as well as the total number of records.
         """
         with sqlite3.connect(self.config['history']['file']) as conn:
