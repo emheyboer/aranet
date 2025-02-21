@@ -21,6 +21,9 @@ date format = %m/%d/%Y %H:%M:%S
 # add new readings to the stored history
 update = false
 
+# show minimal output
+short = false
+
 [monitor]
 # send notifications for alerts
 notify = false

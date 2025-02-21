@@ -144,6 +144,7 @@ class History:
             'notify': 'False',
             'update': 'False',
             'monitor': 'False',
+            'short': 'False'
         }
 
         config.read(filename)
@@ -166,6 +167,8 @@ class History:
             config['history']['update'] = str(args.update)
         if args.monitor is not None:
             config['monitor']['monitor'] = str(args.monitor)
+        if args.short is not None:
+            config['history']['short'] = str(args.short)
 
 
         return config
@@ -251,10 +254,10 @@ class History:
                 print(line)
 
 
-    def print(self, get_stats=True, new_records=None) -> None:
+    def print(self, short=False, new_records=None) -> None:
         """
         Prints the table and other information for the user.
-        If get_stats == False, the min, max, and mean rows will be omitted
+        If short == True, the min, max, and mean rows will be omitted
         """
         width = 34
 
@@ -273,11 +276,11 @@ class History:
             print('new records' + f"{new_records:{width - 11},}")
 
         stats = {}
-        if get_stats:
+        if not short:
             stats = self.stats()
         stats['latest'] = self.last_recorded
 
-        if get_stats:
+        if not short:
             print('records' + f"{stats['count']:{width - 7},}")
 
         print('-'*width)
@@ -565,7 +568,7 @@ def parse_args(argv) -> argparse.Namespace:
     Parses command line arguments. All arguments without a default exist as config-file options
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--stats', action=argparse.BooleanOptionalAction, help='load stats from record file', default=True)
+    parser.add_argument('--short', action=argparse.BooleanOptionalAction, help='minimal output')
     parser.add_argument('--update', action=argparse.BooleanOptionalAction, help='get new records from device')
     parser.add_argument('--file', metavar='file_path', help='path to the record file (defaults to records.sqlite)')
     parser.add_argument('--config', metavar='config_path', help='path to the config file (defaults to config.ini)', default='config.ini')
@@ -664,7 +667,7 @@ def main():
     if history.config['history'].getboolean('update'):
         new_records = history.update()
 
-    history.print(get_stats=args.stats, new_records=new_records)
+    history.print(short=args.short, new_records=new_records)
 
     if history.config['monitor'].getboolean('monitor'):
         monitor = Monitor(config=history.config, history=history)
