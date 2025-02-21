@@ -145,7 +145,7 @@ class History:
 
         config['DEFAULT'] = {
             'file': 'records.sqlite',
-            'date format': '%Y/%m/%d %H:%M:%S',
+            'date format': '%m/%d/%Y %H:%M:%S',
             'notify': 'False',
             'update': 'False',
             'monitor': 'False',
@@ -214,7 +214,7 @@ class History:
             row = cursor.fetchone()
             if row is not None:
                 result = Reading(
-                    date = datetime.strptime(row['date'], self.config['history']['date format']).replace(tzinfo=timezone.utc),
+                    date = datetime.fromisoformat(row['date']),
                     co2 = row['co2'],
                     temperature = row['temperature'],
                     humidity = row['humidity'],
@@ -361,7 +361,7 @@ create table if not exists records (
 
             for reading in records:
                 cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
-                    reading.date.strftime(self.config['history']['date format']),
+                    reading.date.isoformat(),
                     reading.co2,
                     reading.temperature,
                     reading.humidity,

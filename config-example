@@ -15,10 +15,8 @@ user =
 # path to the history sqlite db
 file = records.sqlite
 
-# how timestamps should be stored in the db and presented to the user
-# sqlite treats dates as strings,
-# so this should be some variation of y/m/d h/m/s for sorting
-date format = %Y/%m/%d %H:%M:%S
+# how timestamps should be displayed
+date format = %m/%d/%Y %H:%M:%S
 
 # add new readings to the stored history
 update = false
