@@ -437,24 +437,26 @@ class Monitor:
         """
         Starts the scanner and updates the displayed age of the current reading
         """
-        known_age = None
-        offset = 0
+        first_time = True  # whether we've called update_output() before
+        output = None
 
         scanner = aranet4.Aranet4Scanner(self.on_scan)
         await scanner.start()
         while True: # Run forever
-            first_time = False
+            if output is None and self.history.last_recorded is not None:
+                output = self.history.last_recorded.display(DisplayMode.terminal,
+                    history=self.history)
 
-            if self.current is None and self.history.last_recorded is not None:
-                self.current = self.history.last_recorded
-                self.output = self.current.display(DisplayMode.terminal, history=self.history)
-                first_time = True
+            if self.output is not None:
+                output = self.output
 
-            if self.current is not None:
-                age = f"\n  Age:           {self.current.age()}"
+            if output is not None:
+                age = f"\n  Age:           {(self.current or self.history.last_recorded).age()}"
                 if self.interval is not None:
                     age += f"/{self.interval}"
-                update_output(self.output + age, first_time=first_time)
+
+                update_output(output + age, first_time=first_time)
+                first_time = False
 
             await asyncio.sleep(1)
         await scanner.stop()
@@ -545,16 +547,16 @@ class Monitor:
         latest = self.history.last_recorded
         delta = (self.current.date - (latest.date or datetime.fromtimestamp(0, tz=timezone.utc))).total_seconds() 
 
-        # if the reading is new,
-        # display and (maybe) add it to the history
-        if delta > 60:
-            self.output = self.current.display(DisplayMode.terminal, previous=latest, history=self.history)
-            notif_output = self.current.display(DisplayMode.notification, previous=latest, history=self.history)
 
-            self.maybe_notify(notif_output)
+        # the reading is (probably) new
+        if delta > 60 or self.output is None:
+            self.output = self.current.display(DisplayMode.terminal, previous=latest, history=self.history)
 
             # a new distinct reading
-            if 60 < delta:
+            if delta > 60:
+                notif_output = self.current.display(DisplayMode.notification, previous=latest, history=self.history)
+                self.maybe_notify(notif_output)
+
                 # if we're writing to the history, we have to ensure that there are no gaps
                 # delta > (self.interval + 60) indicates that we've missed at least one reading
                 if self.config['history'].getboolean('update') and  delta < (self.interval + 60):
