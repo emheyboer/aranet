@@ -73,7 +73,6 @@ class Reading:
         Represents the reading as a string suitable for the specified display mode.
         If the previous reading is specified, the change in each value is shown
         """
-        output = '\n' if mode == DisplayMode.terminal else ''
         lines = []
 
         co2 = self.co2
@@ -111,16 +110,12 @@ class Reading:
             line += f" {history.percentile('pressure', self.pressure)} percentile"
         lines.append(line)
 
+        line = "  Battery:"
         if self.battery is not None:
             line = f"  Battery:       {self.battery}%"
-            lines.append(line)
-
-        line = f"  Age:           {self.age()}"
-        if self.interval is not None:
-            line += f"/{self.interval}"
         lines.append(line)
 
-        return output + "\n".join(lines)
+        return "\n".join(lines)
 
 
 class History:
@@ -289,9 +284,6 @@ class History:
 
         self.print_table(stats, width)
 
-        print(self.last_recorded.display(DisplayMode.terminal,
-            history=self if get_stats else None), end='\r')
-
 
     def create(self) -> None:
         """
@@ -433,6 +425,7 @@ class Monitor:
         self.interval = None
         self.history = history
         self.current = None
+        self.output = None
         self.config = config
 
     
@@ -446,9 +439,20 @@ class Monitor:
         scanner = aranet4.Aranet4Scanner(self.on_scan)
         await scanner.start()
         while True: # Run forever
-            await asyncio.sleep(1)
+            first_time = False
+
+            if self.current is None and self.history.last_recorded is not None:
+                self.current = self.history.last_recorded
+                self.output = self.current.display(DisplayMode.terminal, history=self.history)
+                first_time = True
+
             if self.current is not None:
-                print(f"  Age:           {self.current.age()}/{self.interval}" + ' '*5, end='\r')
+                age = f"\n  Age:           {self.current.age()}"
+                if self.interval is not None:
+                    age += f"/{self.interval}"
+                update_output(self.output + age, first_time=first_time)
+
+            await asyncio.sleep(1)
         await scanner.stop()
 
 
@@ -540,10 +544,9 @@ class Monitor:
         # if the reading is new,
         # display and (maybe) add it to the history
         if delta > 60:
-            term_output = self.current.display(DisplayMode.terminal, previous=latest)
-            notif_output = self.current.display(DisplayMode.notification, previous=latest)
+            self.output = self.current.display(DisplayMode.terminal, previous=latest, history=self.history)
+            notif_output = self.current.display(DisplayMode.notification, previous=latest, history=self.history)
 
-            print(term_output, end='\r')
             self.maybe_notify(notif_output)
 
             # a new distinct reading
@@ -572,6 +575,20 @@ def parse_args(argv) -> argparse.Namespace:
 
     return parser.parse_args(argv)
 
+
+def update_output(text, first_time=False):
+    """
+    For any output with a fixed number of lines, replace the previous.
+    """
+    # https://en.wikipedia.org/wiki/ANSI_escape_code
+
+    lines = len(text.split('\n'))
+    # move cursor up x lines, clear to end of screen
+    codes = f"\033[{lines - 1}A\r\033[0J{text}"
+
+    output = text if first_time else codes
+
+    print(output, end='')
 
 
 def find_device() -> str | None:
