@@ -82,32 +82,32 @@ class Reading:
         if previous is not None:
             line += f" {self.show_change(previous.co2, self.co2)}"
         if history is not None:
-            line += f" {history.ranking('co2', self.co2)} place"
-            line += f" {history.percentile('co2', self.co2)} percentile"
+            line += f" — {history.ranking('co2', self.co2)} place"
+            line += f" — {history.percentile('co2', self.co2)} percentile"
         lines.append(line)
 
         line = f"  Temperature:   {(self.temperature):.01f}°F"
         if previous is not None:
             line += f" {self.show_change(previous.temperature, self.temperature)}"
         if history is not None:
-            line += f" {history.ranking('temperature', self.temperature)} place"
-            line += f" {history.percentile('temperature', self.temperature)} percentile"
+            line += f" — {history.ranking('temperature', self.temperature)} place"
+            line += f" — {history.percentile('temperature', self.temperature)} percentile"
         lines.append(line)
 
         line = f"  Humidity:      {self.humidity}%"
         if previous is not None:
             line += f" {self.show_change(previous.humidity, self.humidity)}"
         if history is not None:
-            line += f" {history.ranking('humidity', self.humidity)} place"
-            line += f" {history.percentile('humidity', self.humidity)} percentile"
+            line += f" — {history.ranking('humidity', self.humidity)} place"
+            line += f" — {history.percentile('humidity', self.humidity)} percentile"
         lines.append(line)
 
         line = f"  Pressure:      {self.pressure:.01f} hPa"
         if previous is not None:
             line += f" {self.show_change(previous.pressure, self.pressure)}"
         if history is not None:
-            line += f" {history.ranking('pressure', self.pressure)} place"
-            line += f" {history.percentile('pressure', self.pressure)} percentile"
+            line += f" — {history.ranking('pressure', self.pressure)} place"
+            line += f" — {history.percentile('pressure', self.pressure)} percentile"
         lines.append(line)
 
         line = "  Battery:"
