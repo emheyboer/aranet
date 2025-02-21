@@ -370,7 +370,8 @@ create table if not exists records (
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute(f"select count(*) as count from records where {column} > ?", [value])
+            cursor.execute(f"select count(distinct {column}) as count from records where {column} > ?",
+                [value])
             row = cursor.fetchone()
             rank = row['count'] + 1
 
