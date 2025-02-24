@@ -254,11 +254,13 @@ class History:
                 print(line)
 
 
-    def print(self, short=False, new_records=None) -> None:
+    def print(self, new_records=None) -> None:
         """
         Prints the table and other information for the user.
         If short == True, the min, max, and mean rows will be omitted
         """
+        short = self.config['history'].getboolean('short')
+
         width = 34
 
         print('-'*width)
@@ -669,7 +671,9 @@ def main():
     if history.config['history'].getboolean('update'):
         new_records = history.update()
 
-    history.print(short=args.short, new_records=new_records)
+    if not (history.config['history'].getboolean('short') and
+        history.config['monitor'].getboolean('monitor')):
+        history.print(new_records=new_records)
 
     if history.config['monitor'].getboolean('monitor'):
         monitor = Monitor(config=history.config, history=history)
