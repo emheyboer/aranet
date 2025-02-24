@@ -83,32 +83,32 @@ class Reading:
         if previous is not None:
             line += f" {self.show_change(previous.co2, self.co2)}"
         if history is not None:
-            line += f" — {history.ranking('co2', self.co2)} place"
-            line += f" — {history.percentile('co2', self.co2)} percentile"
+            line += f" — {addSuffix(history.ranking('co2', self.co2))} place"
+            line += f" — {addSuffix(history.percentile('co2', self.co2))} percentile"
         lines.append(line)
 
         line = f"  Temperature:   {(self.temperature):.01f}°F"
         if previous is not None:
             line += f" {self.show_change(previous.temperature, self.temperature)}"
         if history is not None:
-            line += f" — {history.ranking('temperature', self.temperature)} place"
-            line += f" — {history.percentile('temperature', self.temperature)} percentile"
+            line += f" — {addSuffix(history.ranking('temperature', self.temperature))} place"
+            line += f" — {addSuffix(history.percentile('temperature', self.temperature))} percentile"
         lines.append(line)
 
         line = f"  Humidity:      {self.humidity}%"
         if previous is not None:
             line += f" {self.show_change(previous.humidity, self.humidity)}"
         if history is not None:
-            line += f" — {history.ranking('humidity', self.humidity)} place"
-            line += f" — {history.percentile('humidity', self.humidity)} percentile"
+            line += f" — {addSuffix(history.ranking('humidity', self.humidity))} place"
+            line += f" — {addSuffix(history.percentile('humidity', self.humidity))} percentile"
         lines.append(line)
 
         line = f"  Pressure:      {self.pressure:.01f} hPa"
         if previous is not None:
             line += f" {self.show_change(previous.pressure, self.pressure)}"
         if history is not None:
-            line += f" — {history.ranking('pressure', self.pressure)} place"
-            line += f" — {history.percentile('pressure', self.pressure)} percentile"
+            line += f" — {addSuffix(history.ranking('pressure', self.pressure))} place"
+            line += f" — {addSuffix(history.percentile('pressure', self.pressure))} percentile"
         lines.append(line)
 
         line = "  Battery:"
@@ -369,9 +369,9 @@ create table if not exists records (
         self.last_recorded = self.latest()
 
 
-    def ranking(self, column: str, value: float) -> str:
+    def ranking(self, column: str, value: float) -> int:
         """
-        Returns a string indicating that ranking of the value
+        Returns the ranking of the value
         """
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
@@ -381,21 +381,12 @@ create table if not exists records (
             row = cursor.fetchone()
             rank = row['count'] + 1
 
-            rightmost_digit = rank % 10
-            if rightmost_digit == 1:
-                suffix = 'st'
-            elif rightmost_digit == 2:
-                suffix = 'nd'
-            elif rightmost_digit == 3:
-                suffix = 'rd'
-            else:
-                suffix = 'th'
-            return f"{rank:,}{suffix}"
+            return rank
 
 
-    def percentile(self, column: str, value: float) -> str: 
+    def percentile(self, column: str, value: float) -> int: 
         """
-        Returns a string indicating which percentile the value falls in
+        Returns which percentile the value falls in
         """
         with sqlite3.connect(self.config['history']['file']) as conn:
             conn.row_factory = sqlite3.Row
@@ -412,16 +403,7 @@ create table if not exists records (
 
             percentile = round(percentile)
 
-            rightmost_digit = percentile % 10
-            if rightmost_digit == 1:
-                suffix = 'st'
-            elif rightmost_digit == 2:
-                suffix = 'nd'
-            elif rightmost_digit == 3:
-                suffix = 'rd'
-            else:
-                suffix = 'th'
-            return f"{percentile:,}{suffix}"
+            return percentile
 
 
 class Monitor:
@@ -509,7 +491,7 @@ class Monitor:
             alerts.append('high temperature')
         for col in ['co2', 'temperature', 'humidity', 'pressure']:
             rank = self.history.ranking(col, current[col])
-            if rank == '1st':
+            if rank == 1:
                 alerts.append(f"new {col} high score")
                 should_expire = False
 
@@ -582,6 +564,25 @@ class RedirectedStdout:
     def __exit__(self, *args):
         sys.stdout.close()
         sys.stdout = self._stdout
+
+
+def addSuffix(n: int) -> str:
+    """
+    Adds the suffix used with a given integer.
+    """
+    ones = n % 10
+    tens = n % 100 // 10
+    if tens == 1:
+        suffix = 'th'
+    elif ones == 1:
+        suffix = 'st'
+    elif ones == 2:
+        suffix = 'nd'
+    elif ones == 3:
+        suffix = 'rd'
+    else:
+        suffix = 'th'
+    return f"{n:,}{suffix}"
 
 
 def parse_args(argv) -> argparse.Namespace:
