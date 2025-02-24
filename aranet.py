@@ -1,6 +1,7 @@
 #!/usr/bin/env venv/bin/python
 import aranet4
 import sys
+import os
 import tzlocal
 import argparse
 import sqlite3
@@ -567,6 +568,22 @@ class Monitor:
                     self.history.last_recorded = self.current
 
 
+class RedirectedStdout:
+    """
+    Temporarily redirects stdout to target
+    """
+    def __init__(self, target):
+        self._target = target
+
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = open(self._target, 'w')
+
+    def __exit__(self, *args):
+        sys.stdout.close()
+        sys.stdout = self._stdout
+
+
 def parse_args(argv) -> argparse.Namespace:
     """
     Parses command line arguments. All arguments without a default exist as config-file options
@@ -669,7 +686,13 @@ def main():
 
     new_records = None
     if history.config['history'].getboolean('update'):
-        new_records = history.update()
+        if history.config['history'].getboolean('short'):
+            # aranet4's get_all_records function makes calls to print()
+            # if we're minimizing output, those should be prevented
+            with RedirectedStdout(os.devnull):
+                new_records = history.update()
+        else:
+            new_records = history.update()
 
     if not (history.config['history'].getboolean('short') and
         history.config['monitor'].getboolean('monitor')):
