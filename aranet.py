@@ -126,11 +126,25 @@ class History:
     def __init__(self, *, config_file: str, args: argparse.Namespace):
         self.config = self.load_config(config_file, args)
 
+
+    def __enter__(self):
+        self.connection = sqlite3.connect(self.config['history']['file'])
+        self.connection.row_factory = sqlite3.Row
+        self.cursor = self.connection.cursor()
+
         self.create()
 
         # last_recorded stores the last known reading even if it hasn't been written to the history
         # this is overridden whenver write() is called
         self.last_recorded = self.latest()
+
+        return self
+
+
+    def __exit__(self, ext_type, exc_value, traceback):
+        #self.connection.commit()
+        self.cursor.close()
+        self.connection.close()
 
 
     def load_config(self, filename: str, args: argparse.Namespace) -> configparser.ConfigParser:
@@ -180,25 +194,21 @@ class History:
         Returns a dictionary containing min, max, and mean values for co2, temperature, humidity, and pressure
         as well as the total number of records.
         """
-        with sqlite3.connect(self.config['history']['file']) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-
-            cols = ['co2', 'temperature', 'humidity', 'pressure']
-            stats = {
-                'min': f"select {', '.join([f"min({col}) as {col}" for col in cols])} from records;",
-                'max': f"select {', '.join([f"max({col}) as {col}" for col in cols])} from records;",
-                'mean': f"select {', '.join([f"avg({col}) as {col}" for col in cols])} from records;",
-                'count': "select count(*) from records",
-            }
-            for stat in stats:
-                cursor.execute(stats[stat])
-                row = cursor.fetchone()
-                if stat == 'count':
-                    stats[stat] = row[0]
-                else:
-                    stats[stat] = dict(row)
-            return stats
+        cols = ['co2', 'temperature', 'humidity', 'pressure']
+        stats = {
+            'min': f"select {', '.join([f"min({col}) as {col}" for col in cols])} from records;",
+            'max': f"select {', '.join([f"max({col}) as {col}" for col in cols])} from records;",
+            'mean': f"select {', '.join([f"avg({col}) as {col}" for col in cols])} from records;",
+            'count': "select count(*) from records",
+        }
+        for stat in stats:
+            self.cursor.execute(stats[stat])
+            row = self.cursor.fetchone()
+            if stat == 'count':
+                stats[stat] = row[0]
+            else:
+                stats[stat] = dict(row)
+        return stats
 
 
 
@@ -206,28 +216,25 @@ class History:
         """
         Returns the last recorded reading
         """
-        with sqlite3.connect(self.config['history']['file']) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("select * from records order by date desc limit 1")
-            row = cursor.fetchone()
-            if row is not None:
-                result = Reading(
-                    date = datetime.fromisoformat(row['date']),
-                    co2 = row['co2'],
-                    temperature = row['temperature'],
-                    humidity = row['humidity'],
-                    pressure = row['pressure'],
-                )
-            else:
-                result = Reading(
-                    date = None,
-                    co2 = None,
-                    temperature = None,
-                    humidity = None,
-                    pressure = None,
-                )
-            return result
+        self.cursor.execute("select * from records order by date desc limit 1")
+        row = self.cursor.fetchone()
+        if row is not None:
+            result = Reading(
+                date = datetime.fromisoformat(row['date']),
+                co2 = row['co2'],
+                temperature = row['temperature'],
+                humidity = row['humidity'],
+                pressure = row['pressure'],
+            )
+        else:
+            result = Reading(
+                date = None,
+                co2 = None,
+                temperature = None,
+                humidity = None,
+                pressure = None,
+            )
+        return result
 
 
     def print_table(self, stats: dict, width: int) -> None:
@@ -295,19 +302,17 @@ class History:
         """
         Creates both the sqlite db and the records table if they don't already exist
         """
-        with sqlite3.connect(self.config['history']['file']) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
+        self.cursor.execute("""
 create table if not exists records (
-    date text,
-    co2 real,
-    temperature real,
-    humidity real,
-    pressure real,
-    primary key(date)
+date text,
+co2 real,
+temperature real,
+humidity real,
+pressure real,
+primary key(date)
 );
-                           """)
-                conn.commit()
+                   """)
+        self.connection.commit()
 
 
     def update(self) -> int:
@@ -354,18 +359,15 @@ create table if not exists records (
         """
         Writes records to the sqlite db
         """
-        with sqlite3.connect(self.config['history']['file']) as conn:
-            cursor = conn.cursor()
-
-            for reading in records:
-                cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
-                    reading.date.isoformat(),
-                    reading.co2,
-                    reading.temperature,
-                    reading.humidity,
-                    reading.pressure,
-                ])
-            conn.commit()
+        for reading in records:
+            self.cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
+                reading.date.isoformat(),
+                reading.co2,
+                reading.temperature,
+                reading.humidity,
+                reading.pressure,
+            ])
+        self.connection.commit()
         self.last_recorded = self.latest()
 
 
@@ -373,37 +375,31 @@ create table if not exists records (
         """
         Returns the ranking of the value
         """
-        with sqlite3.connect(self.config['history']['file']) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(f"select count(distinct {column}) as count from records where {column} > ?",
-                [value])
-            row = cursor.fetchone()
-            rank = row['count'] + 1
+        self.cursor.execute(f"select count(distinct {column}) as count from records where {column} > ?",
+            [value])
+        row = self.cursor.fetchone()
+        rank = row['count'] + 1
 
-            return rank
+        return rank
 
 
     def percentile(self, column: str, value: float) -> int: 
         """
         Returns which percentile the value falls in
         """
-        with sqlite3.connect(self.config['history']['file']) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(f"select count(*) as count from records where {column} < ?", [value])
-            row = cursor.fetchone()
-            count = row['count'] + 1
+        self.cursor.execute(f"select count(*) as count from records where {column} < ?", [value])
+        row = self.cursor.fetchone()
+        count = row['count'] + 1
 
-            cursor.execute(f"select count(*) as total from records")
-            row = cursor.fetchone()
-            total = row['total']
+        self.cursor.execute(f"select count(*) as total from records")
+        row = self.cursor.fetchone()
+        total = row['total']
 
-            percentile = count / total * 100
+        percentile = count / total * 100
 
-            percentile = round(percentile)
+        percentile = round(percentile)
 
-            return percentile
+        return percentile
 
 
 class Monitor:
@@ -673,38 +669,37 @@ def colorize(color: str, text: str, mode: DisplayMode) -> str:
 def main():
     args = parse_args(sys.argv[1:])
 
-    history = History(config_file=args.config, args=args)
+    with History(config_file=args.config, args=args) as history:
+        # if a MAC address isn't supplied by config or arguments,
+        # we can try to scan for bluetooth devices
+        needs_mac = history.config['history'].getboolean('update') or history.config['monitor'].getboolean('monitor')
+        if 'mac' not in history.config['aranet'] and needs_mac:
+            mac = find_device()
+            if mac is None:
+                print('Unable to get device MAC address')
+                exit(1)
+            history.config['aranet']['mac'] = mac
 
-    # if a MAC address isn't supplied by config or arguments,
-    # we can try to scan for bluetooth devices
-    needs_mac = history.config['history'].getboolean('update') or history.config['monitor'].getboolean('monitor')
-    if 'mac' not in history.config['aranet'] and needs_mac:
-        mac = find_device()
-        if mac is None:
-            print('Unable to get device MAC address')
-            exit(1)
-        history.config['aranet']['mac'] = mac
-
-    new_records = None
-    if history.config['history'].getboolean('update'):
-        if history.config['history'].getboolean('short'):
-            # aranet4's get_all_records function makes calls to print()
-            # if we're minimizing output, those should be prevented
-            with RedirectedStdout(os.devnull):
+        new_records = None
+        if history.config['history'].getboolean('update'):
+            if history.config['history'].getboolean('short'):
+                # aranet4's get_all_records function makes calls to print()
+                # if we're minimizing output, those should be prevented
+                with RedirectedStdout(os.devnull):
+                    new_records = history.update()
+            else:
                 new_records = history.update()
-        else:
-            new_records = history.update()
 
-    if not (history.config['history'].getboolean('short') and
-        history.config['monitor'].getboolean('monitor')):
-        history.print(new_records=new_records)
+        if not (history.config['history'].getboolean('short') and
+            history.config['monitor'].getboolean('monitor')):
+            history.print(new_records=new_records)
 
-    if history.config['monitor'].getboolean('monitor'):
-        monitor = Monitor(config=history.config, history=history)
-        try:
-            asyncio.run(monitor.start())
-        except KeyboardInterrupt:
-            print("User interupted.")
+        if history.config['monitor'].getboolean('monitor'):
+            monitor = Monitor(config=history.config, history=history)
+            try:
+                asyncio.run(monitor.start())
+            except KeyboardInterrupt:
+                print("User interupted.")
 
 
 if __name__ == '__main__':
