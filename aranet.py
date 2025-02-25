@@ -142,7 +142,6 @@ class History:
 
 
     def __exit__(self, ext_type, exc_value, traceback):
-        #self.connection.commit()
         self.cursor.close()
         self.connection.close()
 
@@ -359,15 +358,15 @@ primary key(date)
         """
         Writes records to the sqlite db
         """
-        for reading in records:
-            self.cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
-                reading.date.isoformat(),
-                reading.co2,
-                reading.temperature,
-                reading.humidity,
-                reading.pressure,
-            ])
-        self.connection.commit()
+        with self.connection:
+            for reading in records:
+                self.cursor.execute("insert into records(date, co2, temperature, humidity, pressure) values(?,?,?,?,?)", [
+                    reading.date.isoformat(),
+                    reading.co2,
+                    reading.temperature,
+                    reading.humidity,
+                    reading.pressure,
+                ])
         self.last_recorded = self.latest()
 
 
