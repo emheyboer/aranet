@@ -482,7 +482,7 @@ class Monitor:
             alerts.append('rising co2')
         if current.temperature < 50:
             alerts.append('low temperature')
-        if current.temperature > 80:
+        if current.temperature > 90:
             alerts.append('high temperature')
         for col in ['co2', 'temperature', 'humidity', 'pressure']:
             rank = self.history.ranking(col, current[col])
