@@ -11,6 +11,7 @@ import urllib
 import asyncio
 from datetime import datetime, timezone, timedelta
 from enum import Enum
+from escpos.printer import CupsPrinter
 
 
 class DisplayMode(Enum):
@@ -19,6 +20,7 @@ class DisplayMode(Enum):
     """
     terminal = 1
     notification = 2
+    printer = 3
 
 
 class Reading:
@@ -158,12 +160,13 @@ class History:
             'notify': 'False',
             'update': 'False',
             'monitor': 'False',
-            'short': 'False'
+            'short': 'False',
+            'print': 'False',
         }
 
         config.read(filename)
 
-        sections = ['aranet', 'pushover', 'history', 'monitor']
+        sections = ['aranet', 'pushover', 'printer', 'history', 'monitor']
         for section in sections:
             if section not in config:
                 config[section] = {}
@@ -183,6 +186,8 @@ class History:
             config['monitor']['monitor'] = str(args.monitor)
         if args.short is not None:
             config['history']['short'] = str(args.short)
+        if args.print is not None:
+            config['printer']['print'] = str(args.print)
 
 
         return config
@@ -412,7 +417,7 @@ class Monitor:
         self.output = None
         self.config = config
 
-    
+
     async def start(self) -> None:
         """
         Starts the scanner and updates the displayed age of the current reading
@@ -537,12 +542,34 @@ class Monitor:
                 notif_output = self.current.display(DisplayMode.notification, previous=latest, history=self.history)
                 self.maybe_notify(notif_output)
 
+                print_output = self.current.display(DisplayMode.printer)
+                self.maybe_print(print_output)
+                    
                 # if we're writing to the history, we have to ensure that there are no gaps
                 # delta > (self.interval + 60) indicates that we've missed at least one reading
                 if self.config['history'].getboolean('update') and  delta < (self.interval + 60):
                         self.history.write([self.current])
                 else:
                     self.history.last_recorded = self.current
+
+
+    def maybe_print(self, output: str) -> None:
+        if not self.config['printer'].getboolean('print'):
+            return
+
+        printer = CupsPrinter(self.config['printer']['printer name'],
+            profile="default")
+
+        if not (printer.is_usable() or self.config['history'].getboolean('short')):
+            print('printer is not usable')
+            return
+        if not (printer.is_online() or self.config['history'].getboolean('short')):
+            print('printer is offline')
+            return
+
+        printer.text(output)
+        printer.cut()
+        printer.close()
 
 
 class RedirectedStdout:
@@ -593,6 +620,7 @@ def parse_args(argv) -> argparse.Namespace:
     parser.add_argument('--mac', metavar='mac_address', help='mac address of the device')
     parser.add_argument('--notify', action=argparse.BooleanOptionalAction, help='send notifcations when appropriate')
     parser.add_argument('--monitor', action=argparse.BooleanOptionalAction, help='passively scan for updates')
+    parser.add_argument('--print', action=argparse.BooleanOptionalAction, help='send readings to a printer')
 
     return parser.parse_args(argv)
 

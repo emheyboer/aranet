@@ -11,6 +11,10 @@ token =
 # user token 
 user = 
 
+[printer]
+printer name = 
+print = false
+
 [history]
 # path to the history sqlite db
 file = records.sqlite
