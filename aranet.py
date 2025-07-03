@@ -200,9 +200,9 @@ class History:
         """
         cols = ['co2', 'temperature', 'humidity', 'pressure']
         stats = {
-            'min': f"select {', '.join([f"min({col}) as {col}" for col in cols])} from records;",
-            'max': f"select {', '.join([f"max({col}) as {col}" for col in cols])} from records;",
-            'mean': f"select {', '.join([f"avg({col}) as {col}" for col in cols])} from records;",
+            'min': "select " + ', '.join([f"min({col}) as {col}" for col in cols]) + " from records;",
+            'max': "select " + ', '.join([f"max({col}) as {col}" for col in cols]) + " from records;",
+            'mean': "select " + ', '.join([f"avg({col}) as {col}" for col in cols]) + " from records;",
             'count': "select count(*) from records",
         }
         for stat in stats:
@@ -246,7 +246,7 @@ class History:
         Prints a table containing the min, max, mean, and last recorded values for each column.
         Omitted rows will be skipped. Omitted values will be replaced with 'x'
         """
-        print(f"{"temp  humid  press    co2":>34}")
+        print(f"{'temp  humid  press    co2':>34}")
         columns = [  # (name, suffix)
             ('temperature', '°'),
             ('humidity','%'),
