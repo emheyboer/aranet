@@ -92,7 +92,7 @@ class Reading:
         if previous is not None:
             line += f" {self.show_change(previous.col(column), self.col(column))}"
         if history is not None:
-            line += f" — {addSuffix(history.ranking(column.value, self.col(column)))} place"
+            line += f" — {addSuffix(history.ranking(column.value, self.col(column)))}"
             line += f" — {addSuffix(history.percentile(column.value, self.col(column)))} percentile"
         return line
 
