@@ -4,16 +4,16 @@ A tool for storing and displaying records from an Aranet4 sensor.
 ## Finding the Device
 First, you'll need to specify the mac address of your Aranet4 device. This can be done via either the `--mac` flag or `mac` in `config.ini`. If you don't know its mac address, calling `aranet --update` will initiate a scan for devices and will request all the readings on the device (the last ~2 weeks of records). The scan output (as shown below) provides the addresses of any nearby Aranet4 devices. The mac address should then be added to `config.ini` to skip the scanning process on future invocations.
 
-![](images/find_device.png)
+<img src=images/find_device.png />
 
 ## Updating and Monitoring
 In most cases, you'll want to set `--update` or `update = true` before calling `aranet.py`. This requests new records from the device and adds them to the sqlite database. To keep the program running and scanning for new readings, you'll need to set `--monitor` or `monitor = true`. This mode passively listens for bluetooth advertising packets from the Aranet4, parses the readings, and adds them to the database. On-screen, it displays the latest readings as well as some historical information to provide context.
 
-![](images/monitor.png) 
+<img src=images/monitor.png />
 
 ## Viewing Historical Stats
 When invoked with `--no-short` or `short = false`, `aranet.py` will print out a table summarizing the historical records in the sqlite database.
-![](images/table.png)
+<img src=images/table.png />
 
 
 # Configuration
@@ -21,4 +21,4 @@ The file `config.ini` (see `config-example` for usage) stores all user configura
 
 Command line flags also provide most of the same options (as shown below).
 
-![](images/usage.png)
+<img src=images/usage.png />
