@@ -86,6 +86,7 @@ class Reading:
         if column == Column.co2 and self.status is not None:
             value = colorize(self.status.name.lower(), value, mode)
 
+        value = bold(value, mode)
         line = f"  {column.value}:{' ' * (14 - len(column.value))}{value}{suffix}"
 
         if previous is not None:
@@ -662,6 +663,19 @@ def find_device() -> str | None:
         return device.address
 
     return None
+
+
+def bold(text: str, mode: DisplayMode) -> str:
+    """
+    Bolds text for the specified display mode
+    """
+    if mode == DisplayMode.notification:
+        result = f"<b>{text}</b>"
+    elif mode == DisplayMode.terminal:
+        result = '\x1b[1m{}\x1b[22m'.format(text)
+    else:
+        result = text
+    return result
 
 
 def colorize(color: str, text: str, mode: DisplayMode) -> str:
