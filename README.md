@@ -25,7 +25,7 @@ When invoked with `--no-short` or `short = false`, `aranet.py` will print out a 
 <img width="50%" height="50%" src=images/notification.jpg />
 
 ## Printing Readings
-New readings can be automatically sent to a receipt printer. To do this, you'll need to have the connected printer configured using CUPS. Then set `printer name` to the printer's name in CUPS. Once invoked with either `--print` or `print = true`, all new readings will be automatically printed as long as the printer is connected. If supported by the receipt printer, printoffs will be cut.
+New readings can be automatically sent to an ESC/POS compatible receipt printer. To do this, you'll need to have the connected printer configured using CUPS. Then set `printer name` to the printer's name in CUPS. Once invoked with either `--print` or `print = true`, all new readings will be automatically printed as long as the printer is connected. If supported by the receipt printer, printoffs will be cut.
 
 <img width="50%" height="50%" src=images/printoff.jpg />
 
