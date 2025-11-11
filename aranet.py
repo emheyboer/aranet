@@ -23,6 +23,13 @@ class DisplayMode(Enum):
     printer = 3
 
 
+class Column(Enum):
+    co2 = "co2"
+    temperature = "temperature"
+    humidity = "humidity"
+    pressure = "pressure"
+
+
 class Reading:
     """
     A single sensor reading
@@ -43,6 +50,10 @@ class Reading:
 
     def __getitem__(self, item: str):
         return getattr(self, item)
+
+
+    def col(self, column: Column):
+        return self.__getitem__(column.value)
 
 
     def age(self) -> int:
@@ -68,6 +79,21 @@ class Reading:
         elif delta < 0:
             symbol = '↓'
         return f"{symbol} {delta:.01f}"
+    
+
+    def display_row(self, column: Column, value: str, suffix: str, mode: DisplayMode, previous: 'Reading' = None,
+                history: 'History' = None) -> str:
+        if column == Column.co2 and self.status is not None:
+            value = colorize(self.status.name.lower(), value, mode)
+
+        line = f"  {column.value}:{' ' * (14 - len(column.value))}{value}{suffix}"
+
+        if previous is not None:
+            line += f" {self.show_change(previous.col(column), self.col(column))}"
+        if history is not None:
+            line += f" — {addSuffix(history.ranking(column.value, self.col(column)))} place"
+            line += f" — {addSuffix(history.percentile(column.value, self.col(column)))} percentile"
+        return line
 
 
     def display(self, mode: DisplayMode, previous: 'Reading' = None,
@@ -76,46 +102,16 @@ class Reading:
         Represents the reading as a string suitable for the specified display mode.
         If the previous reading is specified, the change in each value is shown
         """
-        lines = []
+        lines = [
+            self.display_row(Column.co2, f"{self.co2}", " ppm", mode, previous, history),
+            self.display_row(Column.temperature, f"{(self.temperature):.01f}", "°F", mode, previous, history),
+            self.display_row(Column.humidity, f"{self.humidity}","%", mode, previous, history),
+            self.display_row(Column.pressure, f"{self.pressure:.01f}", " hPa", mode, previous, history),
+        ]
 
-        co2 = self.co2
-        if self.status is not None:
-            co2 = colorize(self.status.name.lower(), self.co2, mode)
-        line = f"  CO2:           {co2} ppm"
-        if previous is not None:
-            line += f" {self.show_change(previous.co2, self.co2)}"
-        if history is not None:
-            line += f" — {addSuffix(history.ranking('co2', self.co2))} place"
-            line += f" — {addSuffix(history.percentile('co2', self.co2))} percentile"
-        lines.append(line)
-
-        line = f"  Temperature:   {(self.temperature):.01f}°F"
-        if previous is not None:
-            line += f" {self.show_change(previous.temperature, self.temperature)}"
-        if history is not None:
-            line += f" — {addSuffix(history.ranking('temperature', self.temperature))} place"
-            line += f" — {addSuffix(history.percentile('temperature', self.temperature))} percentile"
-        lines.append(line)
-
-        line = f"  Humidity:      {self.humidity}%"
-        if previous is not None:
-            line += f" {self.show_change(previous.humidity, self.humidity)}"
-        if history is not None:
-            line += f" — {addSuffix(history.ranking('humidity', self.humidity))} place"
-            line += f" — {addSuffix(history.percentile('humidity', self.humidity))} percentile"
-        lines.append(line)
-
-        line = f"  Pressure:      {self.pressure:.01f} hPa"
-        if previous is not None:
-            line += f" {self.show_change(previous.pressure, self.pressure)}"
-        if history is not None:
-            line += f" — {addSuffix(history.ranking('pressure', self.pressure))} place"
-            line += f" — {addSuffix(history.percentile('pressure', self.pressure))} percentile"
-        lines.append(line)
-
-        line = "  Battery:"
+        line = "  battery:"
         if self.battery is not None:
-            line = f"  Battery:       {self.battery}%"
+            line = f"  battery:       {self.battery}%"
         lines.append(line)
 
         return "\n".join(lines)
@@ -436,7 +432,7 @@ class Monitor:
                 output = self.output
 
             if output is not None:
-                age = f"\n  Age:           {(self.current or self.history.last_recorded).age()}"
+                age = f"\n  age:           {(self.current or self.history.last_recorded).age()}"
                 if self.interval is not None:
                     age += f"/{self.interval}"
 
