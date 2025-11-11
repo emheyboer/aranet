@@ -1,4 +1,5 @@
-A tool for storing and displaying records from an Aranet4 sensor.
+# Introduction
+`aranet.py` is a tool for storing and displaying records from an Aranet4 sensor. The goal of this project was to develop a program capable of storing all Aranet4 readings long-term (unlike the official application). Since the program runs passively in the background, it can provide real-time alerts in response to environmental conditions and can integrate with receipt printers to provide tangible, physical feedback. `aranet.py` also uses historical records to help contextualize the current readings and how they compare to past conditions.
 
 # Usage
 ## Finding the Device
