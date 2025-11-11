@@ -16,7 +16,7 @@ from escpos.printer import CupsPrinter
 
 class DisplayMode(Enum):
     """
-    Represents the type of display we're outputting to
+    The type of display we're outputting to
     """
     terminal = 1
     notification = 2
@@ -24,6 +24,9 @@ class DisplayMode(Enum):
 
 
 class Column(Enum):
+    """
+    A column we're storing for each reading and in the sqlite db
+    """
     co2 = "co2"
     temperature = "temperature"
     humidity = "humidity"
@@ -53,6 +56,9 @@ class Reading:
 
 
     def col(self, column: Column):
+        """
+        Reading's stored value for specified column
+        """
         return self.__getitem__(column.value)
 
 
@@ -83,6 +89,9 @@ class Reading:
 
     def display_row(self, column: Column, value: str, suffix: str, mode: DisplayMode, previous: 'Reading' = None,
                 history: 'History' = None) -> str:
+        """
+        Represents a column in the reading for the specified display mode
+        """
         if column == Column.co2 and self.status is not None:
             value = colorize(self.status.name.lower(), value, mode)
 
@@ -467,7 +476,7 @@ class Monitor:
 
     def maybe_notify(self, body: str) -> None:
         """
-        Dertermine whether to alert the user and, if so, what alerts to send and for how long
+        Determine whether to alert the user and, if so, what alerts to send and for how long
         """
         if not self.config['monitor'].getboolean('notify'):
             return
