@@ -15,6 +15,14 @@ In most cases, you'll want to set `--update` or `update = true` before calling `
 When invoked with `--no-short` or `short = false`, `aranet.py` will print out a table summarizing the historical records in the sqlite database.
 <img src=images/table.png />
 
+## Sending Push Notifications
+`aranet.py` supports sending push notifications via Pushover. To get this working, you'll need to create a pushover application and copy both the application token and your user token to `token` and `user` in `config.ini` respectively. When invoked with `--notify` or `notify = true`, a push notification will be sent in any of the following cases:
+- CO2 level is above 1,400 ppm and rising
+- Temperature is below 50°F
+- Temperature is above 90°F 
+- There's a new highscore for CO2, temperature, humidity, or pressure
+
+<img width="50%" height="50%" src=images/notification.jpg />
 
 # Configuration
 The file `config.ini` (see `config-example` for usage) stores all user configuration options. For most uses, you'll want to at least set `mac` and `file` to indicate the device and sqlite file to use respectively. Sending push notifications requires `token`, `user`, and `notify = true`.  Receipt printer integration requires `print = true` and `printer name`. Keep in mind that notifications and printouts are only sent on passive scans, so `monitor = true` is also required for both.
