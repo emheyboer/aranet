@@ -1,5 +1,6 @@
 #!/usr/bin/env venv/bin/python
 import aranet4
+import bleak
 import sys
 import os
 import tzlocal
@@ -335,17 +336,22 @@ primary key(date)
         # that there are never gaps in the history
         latest = self.latest().date or datetime.fromtimestamp(0, tz=timezone.utc)
 
-        records = aranet4.client.get_all_records(
-            self.config['aranet']['mac'],
-            entry_filter = {
-                "temp": True,
-                "humi": True,
-                "pres": True,
-                "co2": True,
-                "start": latest,
-            },
-            remove_empty=True
-        )
+        while True:
+            try:
+                records = aranet4.client.get_all_records(
+                    self.config['aranet']['mac'],
+                    entry_filter = {
+                        "temp": True,
+                        "humi": True,
+                        "pres": True,
+                        "co2": True,
+                        "start": latest,
+                    },
+                    remove_empty=True
+                )
+                break
+            except bleak.exc.BleakDeviceNotFoundError:
+                continue
 
         new_records = []
         for entry in records.value:
