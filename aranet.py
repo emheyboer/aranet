@@ -97,11 +97,11 @@ class Reading:
             value = colorize(self.status.name.lower(), value, mode)
 
         value = bold(value, mode)
-        line = f"  {column.value}:{' ' * (14 - len(column.value))}{value}{suffix}"
+        line = f"{column.value}:{' ' * (14 - len(column.value))}{value}{suffix}"
 
         if previous is not None:
             line += f" {self.show_change(previous.col(column), self.col(column))}"
-        if history is not None:
+        if history is not None and mode != DisplayMode.notification:
             line += f" — {addSuffix(history.ranking(column.value, self.col(column)))}"
             line += f" — {addSuffix(history.percentile(column.value, self.col(column)))} percentile"
         return line
@@ -120,9 +120,9 @@ class Reading:
             self.display_row(Column.pressure, f"{self.pressure:.01f}", " hPa", mode, previous, history),
         ]
 
-        line = "  battery:"
+        line = "battery:"
         if self.battery is not None:
-            line = f"  battery:       {self.battery}%"
+            line = f"battery:       {self.battery}%"
         lines.append(line)
 
         return "\n".join(lines)
@@ -448,7 +448,7 @@ class Monitor:
                 output = self.output
 
             if output is not None:
-                age = f"\n  age:           {(self.current or self.history.last_recorded).age()}"
+                age = f"\nage:           {(self.current or self.history.last_recorded).age()}"
                 if self.interval is not None:
                     age += f"/{self.interval}"
 
